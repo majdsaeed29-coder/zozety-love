@@ -18,20 +18,25 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-      
-    # الحل: إنشاء gradlew تلقائيًا إذا لم يكن موجودًا
-    - name: Generate gradlew if missing
+    
+    # 1. إنشاء هيكل Gradle إذا كان مفقودًا
+    - name: Setup Gradle Wrapper
       run: |
+        # أنشئ مجلد wrapper إذا لم يكن موجودًا
+        mkdir -p gradle/wrapper
+        # أنزل ملف gradle-wrapper.jar مباشرةً
+        wget -q https://github.com/gradle/gradle/raw/rel/v8.5/wrapper/gradle-wrapper.jar -P gradle/wrapper/
+      
+    # 2. الآن gradlew يجب أن يعمل
+    - name: Make gradlew executable
+      run: |
+        chmod +x ./gradlew || echo "gradlew not found, will download it"
         if [ ! -f "./gradlew" ]; then
-          echo "gradlew not found, generating wrapper..."
-          ./gradle/wrapper/gradlew wrapper --gradle-version 8.5
-        else
-          echo "gradlew exists, continuing..."
+          # أنزل سكريبت gradlew إذا كان مفقودًا
+          wget -q https://raw.githubusercontent.com/gradle/gradle/master/gradlew
+          chmod +x ./gradlew
         fi
         
-    - name: Make gradlew executable
-      run: chmod +x ./gradlew
-      
     - name: Build with Gradle
       run: ./gradlew assembleDebug
       
