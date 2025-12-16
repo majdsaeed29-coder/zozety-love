@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">Zozety Love</string>
+    <string name="login_title">Zozety Love 💖</string>
+    <string name="login_hint">كلمة السر الخاصة بنا</string>
+    <string name="login_button">دخول إلى عالم الحب</string>
+    <string name="forgot_password">نسيت كلمة السر؟</string>
+    <string name="welcome_message">مرحباً في عالم حبنا</string>
+    <string name="new_message">رسالة جديدة</string>
+    <string name="speak_message">🔊 تكلم</string>
+    <string name="play_music">🎵 تشغيل الموسيقى</string>
+    <string name="stop_music">⏸️ إيقاف</string>
+    <string name="add_image">➕ إضافة صورة</string>
+    <string name="send_love">💖 إرسال حب</string>
+    <string name="settings">⚙️ الإعدادات</string>
+</resources>
