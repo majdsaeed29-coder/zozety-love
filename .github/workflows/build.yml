@@ -1,9 +1,7 @@
-name: Build zozety love apk
+name: Build APK for Zozety Love
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+  workflow_dispatch:  # لتشغيله يدوياً
 
 jobs:
   build:
@@ -13,29 +11,40 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up JDK 17
+    - name: Set up Java
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-        
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      
-    - name: Build APK
+    
+    # الخطوة الجديدة: تحميل gradlew إذا كان مفقوداً
+    - name: Setup Gradle Wrapper
       run: |
-        chmod +x gradlew || true
-        ./gradlew assembleDebug || ./gradlew build
+        # 1. أنشئ هيكل المجلدات
+        mkdir -p gradle/wrapper
         
-    - name: Upload APK artifact
+        # 2. حمّل gradlew إذا كان مفقوداً
+        if [ ! -f "gradlew" ]; then
+          echo "Downloading gradlew..."
+          curl -L -o gradlew https://raw.githubusercontent.com/gradle/gradle/master/gradlew
+          chmod +x gradlew
+        fi
+        
+        # 3. حمّل ملفات wrapper الأساسية
+        if [ ! -f "gradle/wrapper/gradle-wrapper.properties" ]; then
+          echo "Creating gradle-wrapper.properties..."
+          echo 'distributionBase=GRADLE_USER_HOME' > gradle/wrapper/gradle-wrapper.properties
+          echo 'distributionPath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
+          echo 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-all.zip' >> gradle/wrapper/gradle-wrapper.properties
+          echo 'zipStoreBase=GRADLE_USER_HOME' >> gradle/wrapper/gradle-wrapper.properties
+          echo 'zipStorePath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
+        fi
+        
+    - name: Build APK
+      run: ./gradlew assembleDebug
+      
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: zozety-love-apk
         path: app/build/outputs/apk/debug/app-debug.apk
-        
-    - name: Upload to Appetize (Optional)
-      if: success()
-      run: |
-        echo "APK built successfully!"
-        echo "Download it from the Artifacts section"
-        echo "Then upload manually to: https://appetize.io/upload"
