@@ -3,7 +3,7 @@ name: Build Zozety Love APK
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # لتشغيله يدوياً
+  workflow_dispatch:
 
 jobs:
   build:
@@ -18,8 +18,18 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+      
+    # الحل: إنشاء gradlew تلقائيًا إذا لم يكن موجودًا
+    - name: Generate gradlew if missing
+      run: |
+        if [ ! -f "./gradlew" ]; then
+          echo "gradlew not found, generating wrapper..."
+          ./gradle/wrapper/gradlew wrapper --gradle-version 8.5
+        else
+          echo "gradlew exists, continuing..."
+        fi
         
-    - name: Grant gradlew execute permission
+    - name: Make gradlew executable
       run: chmod +x ./gradlew
       
     - name: Build with Gradle
