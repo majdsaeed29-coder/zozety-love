@@ -44,33 +44,36 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.10.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.6.2'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2'
+    
+    // ✅ **إضافة التشفير المتقدم**
+    implementation "androidx.security:security-crypto:1.1.0-alpha06"
+    implementation "com.google.crypto.tink:tink-android:1.10.0"
     
     // WorkManager للمهام المجدولة
     implementation "androidx.work:work-runtime-ktx:2.8.1"
     
-    // Google Generative AI (Gemini)
-    implementation 'com.google.ai.client.generativeai:generativeai:0.1.2'
-    
     // Retrofit للشبكات
     implementation 'com.squareup.retrofit2:retrofit:2.9.0'
     implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
     
     // Glide للصور
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     kapt 'com.github.bumptech.glide:compiler:4.16.0'
-    
-    // Text-to-Speech
-    implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.6.2'
-    
-    // Room Database
-    implementation "androidx.room:room-runtime:2.6.0"
-    kapt "androidx.room:room-compiler:2.6.0"
     
     // Coroutines
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
     
     // Exoplayer للموسيقى
     implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
+    
+    // Text-to-Speech
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.2'
+    
+    // JSON
+    implementation 'org.json:json:20230227'
     
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
