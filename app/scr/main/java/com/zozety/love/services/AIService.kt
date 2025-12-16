@@ -14,14 +14,19 @@ object AIService {
     
     private const val TAG = "AIService"
     
-    // ✅ **مفتاح Google AI الخاص بك**
+    // 🔑 **مفتاح Google AI API الخاص بك**
     private const val API_KEY = "AIzaSyAW4298inSXJmhHe9PkkrH97OkBBTWm9sA"
+    private const val GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
     
     private val client = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor(HttpLoggingInterceptor().apply {
+            level = HttpLoggingInterceptor.Level.BASIC
+        })
         .build()
     
+    // رسائل حب محلية احتياطية
     private val localMessages = listOf(
         "حبيبتي، أنتِ النور الذي يضيء حياتي 🌟",
         "كل يوم معكِ هو عيد لحبي ❤️",
@@ -32,100 +37,156 @@ object AIService {
         "أنتِ الحلم الذي أصبح حقيقة 💫",
         "سأظل أحبكِ إلى الأبد ♾️",
         "وجودكِ في حياتي هو أعظم هدية 🎁",
-        "حبكِ يجعل كل شيء جميلاً 🌈"
+        "حبكِ يجعل كل شيء جميلاً 🌈",
+        "أنتِ أغلى ما أملك في هذه الدنيا 💎",
+        "حبي لكِ أكبر من كل الكلمات 💌",
+        "معكِ وجدت معنى الحياة الحقيقي 🌺",
+        "أنتِ موطني الآمن في هذه الحياة 🏡",
+        "عيناكِ تحدثني بلغة الحب الصامتة 👀"
     )
     
     suspend fun generateLoveMessage(context: Context): String? {
         return try {
-            // محاولة استخدام Google Generative AI API
-            val aiMessage = tryGenerateWithGoogleAI()
+            // محاولة استخدام Google Gemini AI
+            val aiMessage = tryGenerateWithGemini()
             aiMessage ?: getLocalMessage()
         } catch (e: Exception) {
-            Log.e(TAG, "AI generation failed: ${e.message}")
+            Log.e(TAG, "AI generation failed: ${e.message}", e)
             getLocalMessage()
         }
     }
     
-    private suspend fun tryGenerateWithGoogleAI(): String? = withContext(Dispatchers.IO) {
+    private suspend fun tryGenerateWithGemini(): String? = withContext(Dispatchers.IO) {
         return@withContext try {
-            // استخدام Gemini API من Google
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=$API_KEY"
+            val url = "$GEMINI_API_URL?key=$API_KEY"
             
-            val requestBody = """
-            {
-                "contents": [{
-                    "parts": [{
-                        "text": "اكتب رسالة حب رومانسية قصيرة باللغة العربية لا تتجاوز 30 كلمة. تكون عاطفية وجميلة."
-                    }]
-                }],
-                "generationConfig": {
-                    "temperature": 0.9,
-                    "topK": 1,
-                    "topP": 1,
-                    "maxOutputTokens": 100,
-                    "stopSequences": []
-                },
-                "safetySettings": [{
-                    "category": "HARM_CATEGORY_HARASSMENT",
-                    "threshold": "BLOCK_MEDIUM_AND_ABOVE"
-                }]
-            }
-            """.trimIndent()
+            // بناء جسم الطلب
+            val requestBody = JSONObject().apply {
+                put("contents", JSONObject().apply {
+                    put("parts", JSONObject().apply {
+                        put("text", generateRandomPrompt())
+                    })
+                })
+                put("generationConfig", JSONObject().apply {
+                    put("temperature", 0.8)
+                    put("topK", 40)
+                    put("topP", 0.95)
+                    put("maxOutputTokens", 150)
+                })
+                put("safetySettings", JSONObject().apply {
+                    put("category", "HARM_CATEGORY_SEXUALLY_EXPLICIT")
+                    put("threshold", "BLOCK_MEDIUM_AND_ABOVE")
+                })
+            }.toString()
+            
+            Log.d(TAG, "Request URL: $url")
+            Log.d(TAG, "Request Body: $requestBody")
             
             val request = Request.Builder()
                 .url(url)
-                .post(RequestBody.create("application/json".toMediaType(), requestBody))
+                .post(requestBody.toRequestBody("application/json".toMediaType()))
                 .addHeader("Content-Type", "application/json")
                 .build()
             
             val response = client.newCall(request).execute()
+            val responseBody = response.body?.string()
             
-            if (response.isSuccessful) {
-                val responseBody = response.body?.string()
-                Log.d(TAG, "Google AI Response: $responseBody")
-                
-                // استخراج النص من الرد
-                extractMessageFromResponse(responseBody)
+            Log.d(TAG, "Response Code: ${response.code}")
+            Log.d(TAG, "Response Body: $responseBody")
+            
+            if (response.isSuccessful && !responseBody.isNullOrEmpty()) {
+                extractMessageFromGeminiResponse(responseBody)
             } else {
-                Log.w(TAG, "API call failed: ${response.code}")
+                Log.w(TAG, "API call failed with code: ${response.code}")
                 null
             }
             
         } catch (e: IOException) {
-            Log.e(TAG, "Network error: ${e.message}")
+            Log.e(TAG, "Network error: ${e.message}", e)
             null
         } catch (e: Exception) {
-            Log.e(TAG, "Error: ${e.message}")
+            Log.e(TAG, "Unexpected error: ${e.message}", e)
             null
         }
     }
     
-    private fun extractMessageFromResponse(response: String?): String? {
-        if (response.isNullOrEmpty()) return null
-        
+    private fun generateRandomPrompt(): String {
+        val prompts = listOf(
+            "اكتب رسالة حب رومانسية قصيرة بالعربية لا تتجاوز 30 كلمة. تكون عاطفية وجميلة.",
+            "رسالة حب عربية قصيرة لحبيبتي، استخدم لغة شعرية رومانسية.",
+            "عبّر عن الحب العميق بالعربية في رسالة لا تزيد عن 25 كلمة.",
+            "اكتب كلمات حب وعشق بالعربية لحبيبة غالية على القلب.",
+            "رسالة صباحية حب بالعربية لحبيبتي، تكون دافئة وعاطفية."
+        )
+        return prompts.random()
+    }
+    
+    private fun extractMessageFromGeminiResponse(response: String): String? {
         return try {
             val json = JSONObject(response)
+            
+            // محاولة استخراج النص من الاستجابة
             val candidates = json.optJSONArray("candidates")
             if (candidates != null && candidates.length() > 0) {
                 val firstCandidate = candidates.getJSONObject(0)
                 val content = firstCandidate.optJSONObject("content")
                 val parts = content?.optJSONArray("parts")
+                
                 if (parts != null && parts.length() > 0) {
-                    val firstPart = parts.getJSONObject(0)
-                    firstPart.optString("text", "").trim()
-                } else {
-                    null
+                    val text = parts.getJSONObject(0).optString("text", "")
+                    if (text.isNotEmpty()) {
+                        return cleanMessage(text)
+                    }
                 }
-            } else {
-                null
             }
+            
+            // محاولة بديلة
+            json.optString("text", "").takeIf { it.isNotEmpty() }?.let {
+                return cleanMessage(it)
+            }
+            
+            null
+            
         } catch (e: Exception) {
-            Log.e(TAG, "Error parsing response: ${e.message}")
+            Log.e(TAG, "Error parsing Gemini response: ${e.message}")
             null
         }
     }
     
+    private fun cleanMessage(message: String): String {
+        return message
+            .trim()
+            .replace(Regex("^[\"']+|[\"']+$"), "") // إزالة علامات الاقتباس
+            .replace(Regex("\\*\\*"), "") // إزالة التنسيق
+            .takeIf { it.length in 10..200 } // التحقق من الطول
+            ?: getLocalMessage() // استخدام رسالة محلية إذا فشل التنظيف
+    }
+    
     private fun getLocalMessage(): String {
         return localMessages.random()
+    }
+    
+    fun getRandomLocalMessage(): String {
+        return localMessages.random()
+    }
+    
+    suspend fun generateMultipleMessages(count: Int = 3): List<String> {
+        return try {
+            val messages = mutableListOf<String>()
+            
+            // محاولة الحصول على رسالة من AI
+            val aiMessage = tryGenerateWithGemini()
+            aiMessage?.let { messages.add(it) }
+            
+            // إكمال العدد بالرسائل المحلية
+            while (messages.size < count) {
+                messages.add(getLocalMessage())
+            }
+            
+            messages.shuffled()
+            
+        } catch (e: Exception) {
+            List(count) { getLocalMessage() }
+        }
     }
 }
