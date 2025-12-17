@@ -8,4 +8,6 @@
     <color name="text_color">#333333</color>
     <color name="text_light">#666666</color>
     <color name="hint_color">#999999</color>
+<color name="ic_launcher_background">#E91E63</color>
+<color name="ic_launcher_foreground">#FFFFFF</color>
 </resources>
