@@ -10,9 +10,11 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.media.RingtoneManager
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.zozety.love.MainActivity
 import com.zozety.love.R
+import com.zozety.love.services.AIService
 import com.zozety.love.services.MessageService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
