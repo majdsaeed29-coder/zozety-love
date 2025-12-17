@@ -14,6 +14,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
 import com.zozety.love.databinding.ActivityMainBinding
+import com.zozety.love.receivers.NotificationReceiver
+import com.zozety.love.services.AIService
+import com.zozety.love.services.MessageService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
