@@ -2,6 +2,10 @@ name: Build APK for Zozety Love
 
 on:
   workflow_dispatch:  # لتشغيله يدوياً
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
@@ -17,29 +21,14 @@ jobs:
         java-version: '17'
         distribution: 'temurin'
     
-    # الخطوة الجديدة: تحميل gradlew إذا كان مفقوداً
-    - name: Setup Gradle Wrapper
-      run: |
-        # 1. أنشئ هيكل المجلدات
-        mkdir -p gradle/wrapper
-        
-        # 2. حمّل gradlew إذا كان مفقوداً
-        if [ ! -f "gradlew" ]; then
-          echo "Downloading gradlew..."
-          curl -L -o gradlew https://raw.githubusercontent.com/gradle/gradle/master/gradlew
-          chmod +x gradlew
-        fi
-        
-        # 3. حمّل ملفات wrapper الأساسية
-        if [ ! -f "gradle/wrapper/gradle-wrapper.properties" ]; then
-          echo "Creating gradle-wrapper.properties..."
-          echo 'distributionBase=GRADLE_USER_HOME' > gradle/wrapper/gradle-wrapper.properties
-          echo 'distributionPath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
-          echo 'distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-all.zip' >> gradle/wrapper/gradle-wrapper.properties
-          echo 'zipStoreBase=GRADLE_USER_HOME' >> gradle/wrapper/gradle-wrapper.properties
-          echo 'zipStorePath=wrapper/dists' >> gradle/wrapper/gradle-wrapper.properties
-        fi
-        
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+      with:
+        gradle-version: '8.5'
+    
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      
     - name: Build APK
       run: ./gradlew assembleDebug
       
@@ -48,3 +37,12 @@ jobs:
       with:
         name: zozety-love-apk
         path: app/build/outputs/apk/debug/app-debug.apk
+        
+    - name: Upload Build Reports
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-reports
+        path: |
+          app/build/reports/
+          app/build/outputs/logs/
