@@ -178,15 +178,15 @@ object SecureStorage {
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
             
-            mapOf(
+            mapOf<String, Any>(
                 "initialized" to sharedPrefs.getBoolean("is_initialized_v2", false),
-                "encryption_type" to sharedPrefs.getString("encryption_type", "Unknown"),
+                "encryption_type" to (sharedPrefs.getString("encryption_type", "Unknown") ?: "Unknown"),
                 "iterations" to sharedPrefs.getInt("hash_iterations", 0),
                 "timestamp" to sharedPrefs.getLong("creation_timestamp", 0)
             )
             
         } catch (e: Exception) {
-            mapOf("error" to e.message ?: "Unknown error")
+            mapOf<String, Any>("error" to (e.message ?: "Unknown error"))
         }
     }
 }
