@@ -1,4 +1,4 @@
-name: Simple Build
+name: Build APK
 
 on: [workflow_dispatch]
 
@@ -13,15 +13,13 @@ jobs:
       uses: actions/setup-java@v4
       with:
         java-version: '17'
-        distribution: 'temurin'
     
     - name: Build APK
       run: |
-        # ابقى في جذر المشروع واستخدم gradle مباشرة
-        ./gradlew assembleDebug || gradle assembleDebug
+        cd app
+        ./gradlew assembleDebug
     
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v4
       with:
         name: APK
         path: app/build/outputs/apk/debug/app-debug.apk
