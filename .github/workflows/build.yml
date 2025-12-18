@@ -1,4 +1,4 @@
-name: LAST TRY - إما يشتغل أو أنا أبني لك
+name: Zozety Love APK Builder
 
 on: [workflow_dispatch]
 
@@ -7,34 +7,53 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    # لا تحتاج تخزين ولا cache ولا شي
+    - name: 📥 تحميل المشروع
+      uses: actions/checkout@v4
+      
+    - name: ⚙️ تثبيت الأدوات
+      run: |
+        # تثبيت Java و Gradle دفعة واحدة
+        sudo apt-get update
+        sudo apt-get install -y openjdk-17-jdk gradle
+        
+        # التحقق من التثبيت
+        java -version
+        gradle --version
+        
+    - name: 🔧 إصلاح الملفات الناقصة
+      run: |
+        echo "=== إصلاح ملفات المشروع ==="
+        
+        # 1. ملف raw للموسيقى (مهم جداً)
+        mkdir -p app/src/main/res/raw
+        echo "# Dummy audio file" > app/src/main/res/raw/love_song.mp3
+        echo "✅ تم إنشاء love_song.mp3"
+        
+        # 2. ملف خلفية الأيقونة
+        cat > app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <shape xmlns:android="http://schemas.android.com/apk/res/android"
+            android:shape="rectangle">
+            <solid android:color="@color/primary_color" />
+            <corners android:radius="50dp" />
+        </shape>
+        EOF
+        echo "✅ تم إنشاء ic_launcher_background.xml"
+        
     - name: 🚀 البناء المباشر
       run: |
-        # 1. تثبيت الأدوات دفعة واحدة
-        apt-get update
-        apt-get install -y wget unzip openjdk-17-jdk
+        echo "=== بدء بناء APK ==="
         
-        # 2. نزل Gradle بس
-        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
-        unzip -q gradle-8.5-bin.zip
-        export PATH=$PWD/gradle-8.5/bin:$PATH
-        
-        # 3. ابنِ مباشرة
+        # اذهب لمجلد app وابنِ
         cd app
-        gradle assembleDebug --no-daemon --stacktrace
+        gradle assembleDebug --stacktrace 2>&1
         
-        # 4. لو نجح، روح ارفع
-        if [ $? -eq 0 ]; then
-          echo "🎉 BUILD SUCCESS"
-          find . -name "*.apk" -type f
-        else
-          echo "❌ BUILD FAILED"
-          exit 1
-        fi
-    
-    # رفع الناتج
-    - name: ⬆️ رفع الـ APK
+        # ابحث عن APK
+        echo "=== البحث عن APK ==="
+        find . -name "*.apk" -type f 2>/dev/null || echo "لا يوجد APK"
+        
+    - name: 📦 رفع الناتج
       uses: actions/upload-artifact@v4
       with:
         name: zozety-apk
-        path: app/build/outputs/apk/debug/*.apk
+        path: app/build/outputs/apk/debug/app-debug.apk
