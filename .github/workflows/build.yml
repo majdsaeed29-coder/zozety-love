@@ -1,42 +1,23 @@
-name: Debug Build Issues
+name: ULTRA SIMPLE BUILD
 
 on: [workflow_dispatch]
 
 jobs:
-  debug:
+  build:
     runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Debug Project Structure
-      run: |
-        echo "=== هيكل المشروع ==="
-        ls -la
-        echo ""
-        echo "=== محتويات app/ ==="
-        ls -la app/
-        echo ""
-        echo "=== ملفات build.gradle ==="
-        find . -name "build.gradle" -type f
-        echo ""
-        echo "=== Gradle wrapper موجود؟ ==="
-        if [ -f "gradlew" ]; then
-          echo "✅ gradlew موجود"
-          chmod +x gradlew
-        else
-          echo "❌ gradlew غير موجود"
-        fi
-    
-    - name: Try Direct Gradle Command
-      run: |
-        echo "=== محاولة البناء المباشر ==="
-        if command -v gradle &> /dev/null; then
-          echo "Gradle مثبت، جاري البناء..."
-          gradle -p app tasks --all
-        else
-          echo "تثبيت Gradle..."
-          sudo apt update
-          sudo apt install -y gradle
-          gradle -p app assembleDebug --dry-run
-        fi
+    - run: |
+        sudo apt update
+        sudo apt install -y wget unzip
+        
+        # نزّل وتثبيت Gradle مباشرة
+        wget https://services.gradle.org/distributions/gradle-8.5-bin.zip
+        unzip gradle-8.5-bin.zip
+        export PATH=$PWD/gradle-8.5/bin:$PATH
+        
+        cd app
+        gradle --version
+        gradle tasks
