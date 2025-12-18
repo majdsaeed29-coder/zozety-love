@@ -1,4 +1,4 @@
-name: Final Build with Login Fix
+name: FINAL BUILD - Zozety Love
 
 on:
   workflow_dispatch:
@@ -12,56 +12,33 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Java
+    - name: Setup Java 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
+        distribution: 'temurin'  # ✅ مطلوب
     
-    - name: 🔧 Apply Login Fixes Automatically
-      run: |
-        echo "=== تطبيق إصلاحات الدخول تلقائياً ==="
-        
-        # 1. إنشاء ملف raw للصوت إذا لم يكن موجوداً
-        mkdir -p app/src/main/res/raw
-        if [ ! -f "app/src/main/res/raw/love_song.mp3" ]; then
-            echo "# Dummy audio file for Zozety Love" > app/src/main/res/raw/love_song.mp3
-            echo "✅ Created love_song.mp3"
-        fi
-        
-        # 2. إصلاح SecureStorage.kt (Type mismatch)
-        if [ -f "app/src/main/java/com/zozety/love/utils/SecureStorage.kt" ]; then
-            sed -i 's/mapOf(/mapOf<String, Any>(/g' app/src/main/java/com/zozety/love/utils/SecureStorage.kt
-            sed -i 's/"error" to e.message/"error" to (e.message ?: "Unknown error")/g' app/src/main/java/com/zozety/love/utils/SecureStorage.kt
-            echo "✅ Fixed SecureStorage.kt type issues"
-        fi
-        
-        # 3. إزالة "نسيت كلمة المرور" من الـ XML
-        if [ -f "app/src/main/res/layout/activity_login.xml" ]; then
-            # تعليق كتلة tvForgotPassword
-            sed -i '/tvForgotPassword/,/\/>/s/^/<!-- /' app/src/main/res/layout/activity_login.xml
-            sed -i '/tvForgotPassword/,/\/>/s/$/ -->/' app/src/main/res/layout/activity_login.xml
-            echo "✅ Removed 'Forgot Password' from XML"
-        fi
-        
-        echo "=== جميع الإصلاحات تم تطبيقها ==="
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v2
+      with:
+        gradle-version: '8.5'
     
     - name: Build APK
       run: |
         cd app
-        echo "🚀 Building APK..."
         chmod +x gradlew 2>/dev/null || true
-        ./gradlew assembleDebug --stacktrace 2>&1 | tail -100
+        ./gradlew assembleDebug --stacktrace
     
     - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: ZozetyLove-Final-APK
+        name: ZozetyLove-APK
         path: app/build/outputs/apk/debug/app-debug.apk
         
-    - name: Upload Build Report
+    - name: Upload Error Log
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: Build-Error-Logs
+        name: Build-Error
         path: app/build/reports/
