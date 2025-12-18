@@ -34,13 +34,13 @@ object SecureStorage {
                 putBoolean("is_initialized_v2", true)
                 putInt("hash_iterations", 5000)
                 putString("encryption_type", "AES-GCM + PBKDF2")
-                apply()
+                apply()  // ✅ استخدم apply()
             }
             
-            Log.d(TAG, "Password saved securely with advanced encryption")
+            Log.d(TAG, "✅ Password saved securely with advanced encryption")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving password: ${e.message}")
+            Log.e(TAG, "❌ Error saving password: ${e.message}")
             
             // تخزين احتياطي في SharedPreferences عادية
             val hash = CryptoUtils.superHash(password, 100)
@@ -48,7 +48,7 @@ object SecureStorage {
                 .edit()
                 .putString("backup_hash", hash)
                 .putBoolean("backup_init", true)
-                .apply()
+                .apply()  // ✅ استخدم apply()
         }
     }
     
@@ -73,7 +73,7 @@ object SecureStorage {
                 val inputHash = CryptoUtils.superHash(inputPassword, iterations)
                 
                 val isValid = storedHash == inputHash
-                Log.d(TAG, "Advanced hash verification: $isValid")
+                Log.d(TAG, "🔒 Advanced hash verification: $isValid")
                 
                 return isValid
             }
@@ -87,7 +87,7 @@ object SecureStorage {
                 if (isValid) {
                     // ترقية التخزين إلى النسخة الجديدة
                     savePassword(context, inputPassword)
-                    Log.d(TAG, "Upgraded old hash to new encryption")
+                    Log.d(TAG, "🔄 Upgraded old hash to new encryption")
                 }
                 
                 return isValid
@@ -105,7 +105,7 @@ object SecureStorage {
             false
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error verifying password: ${e.message}")
+            Log.e(TAG, "⚠️ Error verifying password: ${e.message}")
             
             // المحاولة النهائية: التخزين العادي
             val normalHash = context.getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
@@ -160,10 +160,10 @@ object SecureStorage {
             context.getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
                 .edit().clear().apply()
             
-            Log.d(TAG, "All secure data cleared")
+            Log.d(TAG, "🧹 All secure data cleared")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error clearing data: ${e.message}")
+            Log.e(TAG, "❌ Error clearing data: ${e.message}")
         }
     }
     
