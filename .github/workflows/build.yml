@@ -1,25 +1,42 @@
-name: Simple Android Build
+name: Debug Build Issues
 
 on: [workflow_dispatch]
 
 jobs:
-  build:
+  debug:
     runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup Android Environment
-      uses: android-actions/setup-android@v3
-    
-    - name: Build APK
+    - name: Debug Project Structure
       run: |
-        echo "Building Zozety Love..."
-        cd app
-        gradle tasks  # اختبار Gradle
-        gradle assembleDebug --info
+        echo "=== هيكل المشروع ==="
+        ls -la
+        echo ""
+        echo "=== محتويات app/ ==="
+        ls -la app/
+        echo ""
+        echo "=== ملفات build.gradle ==="
+        find . -name "build.gradle" -type f
+        echo ""
+        echo "=== Gradle wrapper موجود؟ ==="
+        if [ -f "gradlew" ]; then
+          echo "✅ gradlew موجود"
+          chmod +x gradlew
+        else
+          echo "❌ gradlew غير موجود"
+        fi
     
-    - uses: actions/upload-artifact@v4
-      with:
-        name: App-APK
-        path: app/build/outputs/apk/debug/app-debug.apk
+    - name: Try Direct Gradle Command
+      run: |
+        echo "=== محاولة البناء المباشر ==="
+        if command -v gradle &> /dev/null; then
+          echo "Gradle مثبت، جاري البناء..."
+          gradle -p app tasks --all
+        else
+          echo "تثبيت Gradle..."
+          sudo apt update
+          sudo apt install -y gradle
+          gradle -p app assembleDebug --dry-run
+        fi
