@@ -1,4 +1,4 @@
-name: Build APK
+name: FINAL SOLUTION - Build APK
 
 on: [workflow_dispatch]
 
@@ -14,12 +14,35 @@ jobs:
       with:
         java-version: '17'
     
+    - name: 🔥 FINAL FIX - Remove Problematic Adaptive Icons
+      run: |
+        echo "=== حذف جميع ملفات الأيقونة المسببة للمشاكل ==="
+        find app/src/main/res/ -name "*ic_launcher*" -type f -delete
+        rm -rf app/src/main/res/mipmap-anydpi-v26 2>/dev/null || true
+        
+        echo "=== إصلاح AndroidManifest ==="
+        sed -i 's/android:icon="@mipmap\/ic_launcher"/android:icon="@drawable\/ic_heart"/g' app/src/main/AndroidManifest.xml
+        sed -i 's/android:roundIcon="@mipmap\/ic_launcher_round"/android:roundIcon="@drawable\/ic_heart"/g' app/src/main/AndroidManifest.xml
+        
+        echo "=== التحقق من الإصلاح ==="
+        grep -n "icon\|roundIcon" app/src/main/AndroidManifest.xml
+    
     - name: Build APK
       run: |
         cd app
-        ./gradlew assembleDebug
+        echo "🎯 جارٍ بناء APK..."
+        ./gradlew assembleDebug --stacktrace 2>&1 | tail -50
     
-    - uses: actions/upload-artifact@v4
+    - name: Upload APK if Success
+      if: success()
+      uses: actions/upload-artifact@v4
       with:
-        name: APK
+        name: ZozetyLove-FINAL-APK
         path: app/build/outputs/apk/debug/app-debug.apk
+        
+    - name: Upload Error Log if Failed
+      if: failure()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build-Error-Log
+        path: app/build/reports/
