@@ -1,88 +1,35 @@
-name: FINAL BUILD - بدون gradlew
+name: ULTRA SIMPLE BUILD
 
-on: [workflow_dispatch]  # تشغيل يدوي فقط
+on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
     
-    - name: تثبيت Java و Gradle
+    - name: تثبيت الأدوات
       run: |
         sudo apt update
-        sudo apt install -y openjdk-17-jdk gradle
+        sudo apt install -y wget unzip
         
-        # تأكد من التثبيت
-        java -version
+        # نزّل Gradle مباشرة
+        wget https://services.gradle.org/distributions/gradle-8.5-bin.zip
+        unzip gradle-8.5-bin.zip
+        export PATH=$PWD/gradle-8.5/bin:$PATH
         gradle --version
     
-    - name: إصلاح الملفات الناقصة
+    - name: البناء
       run: |
-        # 1. مجلد raw للموسيقى (مهم)
-        mkdir -p app/src/main/res/raw
-        echo "# Dummy audio file" > app/src/main/res/raw/love_song.mp3
-        
-        # 2. ملف خلفية الأيقونة
-        cat > app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <shape xmlns:android="http://schemas.android.com/apk/res/android"
-            android:shape="rectangle">
-            <solid android:color="@color/primary_color" />
-            <corners android:radius="50dp" />
-        </shape>
-        EOF
-        
-        echo "✅ تم إصلاح الملفات الناقصة"
-    
-    - name: البناء المباشر
-      run: |
+        # لا تحتاج لـ gradlew، استخدم gradle مباشرة
         cd app
-        echo "🚀 بداية البناء..."
+        gradle assembleDebug
         
-        # اختبار Gradle
-        gradle tasks --all 2>&1 | head -20
-        
-        # البناء مع عرض الأخطاء
-        gradle assembleDebug --stacktrace 2>&1 | tee build.log
-        
-        # تحقق من النتيجة
-        if grep -q "BUILD SUCCESSFUL" build.log; then
-          echo "✅ ✅ ✅ البناء نجح!"
-        else
-          echo "❌ ❌ ❌ البناء فشل"
-          echo "=== آخر 30 سطر من الأخطاء ==="
-          tail -30 build.log
-        fi
+        # ابحث عن الـ APك بأي طريقة
+        find . -name "*.apk" -type f
     
-    - name: البحث عن الـ APK ورفعه
-      if: success()
-      run: |
-        echo "=== البحث عن ملفات البناء ==="
-        
-        # ابحث في كل الأماكن
-        APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null)
-        
-        if [ -n "$APK_FILES" ]; then
-          echo "📱 وجدنا APK:"
-          echo "$APK_FILES"
-          
-          # ارفع أول APK
-          FIRST_APK=$(echo "$APK_FILES" | head -1)
-          echo "📤 رفع: $FIRST_APK"
-          
-          # أنشئ متغير للخطوة التالية
-          echo "APK_PATH=$FIRST_APK" >> $GITHUB_ENV
-        else
-          echo "❌ لا توجد ملفات APK"
-          echo "=== محتويات مجلد build ==="
-          find app/build/ -type f 2>/dev/null | head -20
-          exit 1
-        fi
-    
-    - name: رفع الـ APK
+    - name: رفع أي ملف apk
       uses: actions/upload-artifact@v4
       with:
-        name: ZozetyLove-APK
-        path: ${{ env.APK_PATH }}
+        name: App-Build
+        path: app/build/outputs/
