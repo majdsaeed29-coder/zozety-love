@@ -1,74 +1,33 @@
-name: Android Build Fixed
+name: Debug Build Location
 
 on: [workflow_dispatch]
 
 jobs:
-  build:
+  debug:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
     
-    - name: Setup JDK
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-    
-    - name: Fix Missing Files
+    - name: Build and Search
       run: |
-        mkdir -p app/src/main/res/raw
-        echo "dummy" > app/src/main/res/raw/love_song.mp3
-    
-    - name: Build APK
-      run: |
+        # تثبيت gradle وبناء
+        sudo apt update && sudo apt install -y gradle
         cd app
-        gradle assembleDebug 2>&1
+        gradle assembleDebug
         
-        # ابحث عن الـ APK بعد البناء
-        echo "=== ملفات APK الموجودة ==="
+        # بحث شامل
+        echo "=== بحث شامل ==="
+        echo "1. كل ملفات apk:"
         find . -name "*.apk" -type f
         
-        # إذا ما في APK، جرب بناء آخر
-        if [ $(find . -name "*.apk" -type f | wc -l) -eq 0 ]; then
-          echo "⚠️ لا توجد ملفات APK، جاري بناء bundle..."
-          gradle bundleDebug 2>&1
-          find . -name "*.aab" -type f
-        fi
-    
-    - name: Find and Upload ALL Build Outputs
-      if: success()
-      run: |
-        echo "=== جمع كل مخرجات البناء ==="
+        echo ""
+        echo "2. هيكل مجلد build:"
+        ls -la build/
         
-        # ابحث عن كل الملفات
-        APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null)
-        AAB_FILES=$(find . -name "*.aab" -type f 2>/dev/null)
+        echo ""
+        echo "3. مجلد outputs:"
+        find build/outputs/ -type f 2>/dev/null || echo "لا يوجد outputs"
         
-        if [ -n "$APK_FILES" ]; then
-          echo "📱 ملفات APK:"
-          echo "$APK_FILES"
-        fi
-        
-        if [ -n "$AAB_FILES" ]; then
-          echo "📦 ملفات AAB (App Bundle):"
-          echo "$AAB_FILES"
-        fi
-        
-        # أنشئ قائمة بكل الملفات للرفع
-        if [ -n "$APK_FILES$AAB_FILES" ]; then
-          echo "FILES_TO_UPLOAD=$APK_FILES $AAB_FILES" >> $GITHUB_ENV
-        else
-          echo "❌ لا توجد ملفات بناء"
-          find app/build/ -type f 2>/dev/null | head -20
-        fi
-    
-    - name: Upload ANY Build File
-      if: success() && env.FILES_TO_UPLOAD != ''
-      uses: actions/upload-artifact@v4
-      with:
-        name: zozety-love-build
-        path: |
-          app/build/outputs/apk/
-          app/build/outputs/bundle/
-        retention-days: 7
+        echo ""
+        echo "4. هل bundle موجود؟"
+        gradle tasks 2>&1 | grep -i "bundle\|apk"
