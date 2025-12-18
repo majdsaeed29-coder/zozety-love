@@ -4,9 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import android.util.Base64
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -16,11 +13,7 @@ import com.zozety.love.databinding.ActivityLoginBinding
 import com.zozety.love.utils.CryptoUtils
 import com.zozety.love.utils.SecureStorage
 import java.nio.charset.StandardCharsets
-import java.security.KeyStore
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
+import java.util.*
 
 class LoginActivity : AppCompatActivity() {
     
@@ -37,19 +30,30 @@ class LoginActivity : AppCompatActivity() {
         binding = ActivityLoginBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
-        // تهيئة التشفير والتخزين الآمن
-        initializeSecurity()
+        // 🔍 تشخيص حالة الدخول
+        Log.d(TAG, "=== LoginActivity Started ===")
+        Log.d(TAG, "DEFAULT_PASSWORD: $DEFAULT_PASSWORD")
+        
+        val testPrefs = getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
+        val isLoggedIn = testPrefs.getBoolean("isLoggedIn", false)
+        Log.d(TAG, "Current login state: $isLoggedIn")
         
         // التحقق من تسجيل الدخول السابق
         if (isUserLoggedIn()) {
+            Log.d(TAG, "User is already logged in, redirecting...")
             startMainActivity()
             return
         }
         
+        // تهيئة التشفير والتخزين الآمن
+        initializeSecurity()
         setupLoginUI()
     }
     
     private fun setupLoginUI() {
+        // ⚠️ تم إزالة "نسيت كلمة السر" نهائياً
+        // binding.tvForgotPassword.setOnClickListener { showHintDialog() }
+        
         binding.btnLogin.setOnClickListener {
             val enteredPassword = binding.etPassword.text.toString().trim()
             
@@ -58,19 +62,29 @@ class LoginActivity : AppCompatActivity() {
                 return@setOnClickListener
             }
             
-            if (validatePassword(enteredPassword)) {
-                saveLoginState()
-                showToast("تم الدخول بنجاح! 💖")
-                startMainActivity()
-            } else {
-                showToast("كلمة السر غير صحيحة")
-                binding.etPassword.text?.clear()
-                binding.etPassword.requestFocus()
-            }
-        }
-        
-        binding.tvForgotPassword.setOnClickListener {
-            showHintDialog()
+            // إظهار تقدم
+            binding.btnLogin.text = "جارٍ التحقق..."
+            binding.btnLogin.isEnabled = false
+            
+            // التحقق في خلفية لمنع تجميد الواجهة
+            Thread {
+                val isValid = validatePassword(enteredPassword)
+                
+                runOnUiThread {
+                    binding.btnLogin.text = "دخول إلى عالم الحب"
+                    binding.btnLogin.isEnabled = true
+                    
+                    if (isValid) {
+                        saveLoginState()
+                        showToast("تم الدخول بنجاح! 💖")
+                        startMainActivity()
+                    } else {
+                        showToast("كلمة السر غير صحيحة")
+                        binding.etPassword.text?.clear()
+                        binding.etPassword.requestFocus()
+                    }
+                }
+            }.start()
         }
         
         binding.etPassword.setOnEditorActionListener { _, _, _ ->
@@ -80,26 +94,41 @@ class LoginActivity : AppCompatActivity() {
     }
     
     private fun validatePassword(password: String): Boolean {
-        // الطريقة 1: التشفير المتقدم والتجزئة
-        val isSecureValid = SecureStorage.verifyPassword(this, password)
+        // ✅ الإصدار المصحح - ترتيب أولويات التحقق
         
-        // الطريقة 2: التحقق المباشر (للتطوير)
-        val isDirectValid = password == DEFAULT_PASSWORD
+        // 1. التحقق المباشر (الأسرع والأضمن)
+        if (password == DEFAULT_PASSWORD) {
+            Log.d(TAG, "✅ Password valid: Direct match")
+            return true
+        }
         
-        // الطريقة 3: التحقق من التجزئة المحلية
-        val storedHash = getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
-            .getString("pass_hash", null)
-        val isHashValid = storedHash == generateSuperHash(password)
-        
-        Log.d(TAG, "Password validation: Secure=$isSecureValid, Direct=$isDirectValid, Hash=$isHashValid")
-        
-        return isSecureValid || isDirectValid || isHashValid
+        // 2. التحقق من التخزين الآمن
+        return try {
+            val isValid = SecureStorage.verifyPassword(this, password)
+            Log.d(TAG, "🔒 Secure storage validation: $isValid")
+            isValid
+        } catch (e: Exception) {
+            Log.e(TAG, "⚠️ Secure validation failed: ${e.message}")
+            
+            // 3. التحقق الاحتياطي (التجزئة المحلية)
+            val storedHash = getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
+                .getString("pass_hash", null)
+            
+            if (storedHash != null) {
+                val inputHash = generateSuperHash(password)
+                val isHashValid = storedHash == inputHash
+                Log.d(TAG, "📊 Hash validation: $isHashValid")
+                return isHashValid
+            }
+            
+            false
+        }
     }
     
     private fun initializeSecurity() {
         // تهيئة التخزين الآمن لأول مرة
         if (!isPasswordInitialized()) {
-            Log.d(TAG, "Initializing secure storage...")
+            Log.d(TAG, "🔐 Initializing secure storage...")
             SecureStorage.savePassword(this, DEFAULT_PASSWORD)
             
             // تخزين تجزئة احتياطية
@@ -107,6 +136,7 @@ class LoginActivity : AppCompatActivity() {
             getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
                 .edit()
                 .putString("pass_hash", hash)
+                .putBoolean("pass_init", true)
                 .apply()
         }
     }
@@ -136,13 +166,15 @@ class LoginActivity : AppCompatActivity() {
             val bytes = input.toByteArray(StandardCharsets.UTF_8)
             val digest = java.security.MessageDigest.getInstance("SHA-256")
             val hashBytes = digest.digest(bytes)
-            Base64.encodeToString(hashBytes, Base64.NO_WRAP)
+            Base64.getEncoder().encodeToString(hashBytes)
         }
     }
     
     private fun saveLoginState() {
+        Log.d(TAG, "💾 Saving login state...")
+        
         try {
-            // التخزين المشفر
+            // 1. التخزين المشفر (EncryptedSharedPreferences)
             val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
             val sharedPrefs = EncryptedSharedPreferences.create(
                 PREFS_NAME,
@@ -156,28 +188,35 @@ class LoginActivity : AppCompatActivity() {
                 putBoolean("is_logged_in", true)
                 putLong("login_time", System.currentTimeMillis())
                 putString("device_id", Build.DEVICE)
-                apply()
+                apply()  // ✅ استخدم apply() بدل commit()
             }
             
-            // تخزين احتياطي
+            // 2. التخزين العادي (احتياطي)
             getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean("isLoggedIn", true)
                 .putLong("lastLogin", System.currentTimeMillis())
-                .apply()
+                .apply()  // ✅ استخدم apply()
+            
+            Log.d(TAG, "✅ Login state saved successfully in both storages")
             
         } catch (e: Exception) {
-            Log.e(TAG, "Error saving login state: ${e.message}")
-            // تخزين عادي كبديل
+            Log.e(TAG, "❌ Error saving login state: ${e.message}")
+            
+            // 3. تخزين عادي كبديل أخير
             getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
                 .edit()
                 .putBoolean("isLoggedIn", true)
                 .apply()
+            
+            Log.d(TAG, "⚠️ Used fallback storage")
         }
     }
     
     private fun isUserLoggedIn(): Boolean {
+        // التحقق من كلا نظامي التخزين
         return try {
+            // 1. التخزين المشفر
             val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
             val sharedPrefs = EncryptedSharedPreferences.create(
                 PREFS_NAME,
@@ -186,33 +225,35 @@ class LoginActivity : AppCompatActivity() {
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
-            sharedPrefs.getBoolean("is_logged_in", false)
+            val encryptedLoggedIn = sharedPrefs.getBoolean("is_logged_in", false)
+            
+            // 2. التخزين العادي
+            val normalLoggedIn = getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
+                .getBoolean("isLoggedIn", false)
+            
+            val result = encryptedLoggedIn || normalLoggedIn
+            Log.d(TAG, "🔍 Login check: Encrypted=$encryptedLoggedIn, Normal=$normalLoggedIn, Result=$result")
+            
+            result
         } catch (e: Exception) {
+            // 3. التحقق الاحتياطي
             getSharedPreferences("ZozetyPrefs", Context.MODE_PRIVATE)
                 .getBoolean("isLoggedIn", false)
         }
     }
     
     private fun startMainActivity() {
+        Log.d(TAG, "🚀 Starting MainActivity...")
+        
         val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
+        
+        // تأكد من إنهاء النشاط بعد الانتقال
         finish()
         
         // تأثير انتقال سلس
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-    }
-    
-    private fun showHintDialog() {
-        android.app.AlertDialog.Builder(this)
-            .setTitle("💖 تلميح خاص")
-            .setMessage("كلمة السر هي: zezemajdlove\n\nهذا التطبيق خاص بنا فقط، لا تشارك كلمة السر مع أحد.")
-            .setPositiveButton("فهمت") { _, _ ->
-                binding.etPassword.setText(DEFAULT_PASSWORD)
-                binding.btnLogin.performClick()
-            }
-            .setNegativeButton("رجوع", null)
-            .setIcon(R.drawable.ic_heart)
-            .show()
     }
     
     private fun showToast(message: String) {
@@ -220,7 +261,7 @@ class LoginActivity : AppCompatActivity() {
     }
     
     override fun onBackPressed() {
-        android.app.AlertDialog.Builder(this)
+        androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("⚠️ تأكيد الخروج")
             .setMessage("هل تريد حقاً الخروج من عالم حبنا؟")
             .setPositiveButton("نعم، أريد الخروج") { _, _ -> 
