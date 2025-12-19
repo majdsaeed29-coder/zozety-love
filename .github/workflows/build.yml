@@ -1,85 +1,75 @@
-[file name]: .github/workflows/ultimate-build.yml
-name: Ultimate Android Build
-on: workflow_dispatch
+[file name]: .github/workflows/final-build.yml
+name: Build Zozety Love
+on: [workflow_dispatch, push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
     steps:
-    # الخطوة 1: جلب الأكواد
-    - uses: actions/checkout@v4
-    
-    # الخطوة 2: تثبيت الأدوات الأساسية
-    - name: Install tools
+    # 1. جلب المشروع
+    - name: Checkout
+      uses: actions/checkout@v4
+      
+    # 2. إعداد Java
+    - name: Setup Java
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'zulu'
+      
+    # 3. إنشاء الملفات المفقودة من أكوادك
+    - name: Create Required Files
       run: |
-        sudo apt update
-        sudo apt install -y wget unzip openjdk-17-jdk
-    
-    # الخطوة 3: إنشاء هيكل المشروع من أكوادك
-    - name: Setup project structure
-      run: |
-        # فقط أنشئ الملفات الضرورية جداً
+        # أنشئ مجلد raw للصوت
         mkdir -p app/src/main/res/raw
-        echo "dummy" > app/src/main/res/raw/love_song.mp3
+        echo "Dummy audio file for build" > app/src/main/res/raw/love_song.mp3
         
-        # ملف build.gradle الأساسي إذا كان ناقصاً
-        if [ ! -f "app/build.gradle" ]; then
-          echo "Creating minimal build.gradle..."
-          cat > app/build.gradle << 'EOF'
-plugins {
-    id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
-}
-
-android {
-    namespace 'com.zozety.love'
-    compileSdk 34
-    defaultConfig {
-        applicationId "com.zozety.love"
-        minSdk 21
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
-    }
-    buildTypes {
-        release {
-            minifyEnabled false
-        }
-    }
-}
-
-dependencies {
-    implementation 'androidx.core:core-ktx:1.12.0'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-}
-EOF
-        fi
-    
-    # الخطوة 4: بناء باستخدام Gradle مباشرة بدون wrapper
-    - name: Direct Gradle Build
+        # أنشئ ملف local.properties بسيط
+        echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
+        
+        # أنشئ أيقونات وهمية
+        for d in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+          mkdir -p "app/src/main/res/mipmap-$d"
+          echo '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android"><path android:fillColor="#FF0000"/></vector>' > "app/src/main/res/mipmap-$d/ic_launcher.xml"
+        done
+        
+        echo "✅ All required files created"
+      
+    # 4. البناء باستخدام Gradle مباشرة
+    - name: Build APK
       run: |
-        echo "Downloading Gradle..."
-        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
-        unzip -q gradle-8.5-bin.zip
-        export PATH=$PWD/gradle-8.5/bin:$PATH
+        # تثبيت Gradle
+        sudo apt-get update
+        sudo apt-get install -y gradle-8.5 || sudo apt-get install -y gradle
         
-        echo "Building with Gradle..."
+        # البناء
+        echo "Starting build..."
+        cd app
         gradle clean
-        gradle assembleDebug
+        gradle assembleDebug 2>&1 | tail -100
         
-        echo "Checking results..."
-        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "No debug APK"
-    
-    # الخطوة 5: النتيجة النهائية
-    - name: Final Check
+        echo "Build finished!"
+        
+    # 5. عرض النتيجة
+    - name: Show Result
       run: |
-        echo "=== BUILD FINISHED ==="
-        if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-          echo "🎉 SUCCESS! APK created."
-          du -h app/build/outputs/apk/debug/app-debug.apk
+        echo "=== BUILD RESULT ==="
+        APK=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
+        
+        if [ -n "$APK" ]; then
+          echo "🎉 SUCCESS! APK created at: $APK"
+          ls -lh "$APK"
         else
-          echo "⚠️ Build may have issues, but process completed."
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APKs generated"
+          echo "⚠️ No APK found. Checking build directory..."
+          ls -la app/build/outputs/ 2>/dev/null || echo "No outputs directory"
         fi
+        
+    # 6. رفع النتيجة إذا نجح
+    - name: Upload APK
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Zozety-Love-APK
+        path: app/build/outputs/apk/debug/*.apk
 [file content end]
