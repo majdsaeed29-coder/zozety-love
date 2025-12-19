@@ -1,53 +1,35 @@
 [file name]: .github/workflows/build.yml
 [file content begin]
-name: "Android Build"
+name: Android Build
 
 on:
   workflow_dispatch:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout repository
+    - name: Checkout code
       uses: actions/checkout@v4
-      
+    
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
-        java-version: "17"
-        distribution: "temurin"
-        
-    - name: Setup Android environment
-      run: |
-        # تثبيت Android SDK
-        sudo apt-get update
-        sudo apt-get install -y wget unzip
-        
-        # تحميل Android SDK Command Line Tools
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
-        unzip -q commandlinetools-linux-*.zip -d android-sdk
-        rm commandlinetools-linux-*.zip
-        
-        # إعداد المسار
-        mkdir -p android-sdk/cmdline-tools/latest
-        mv android-sdk/cmdline-tools/* android-sdk/cmdline-tools/latest/
-        
-        # قبول التراخيص
-        yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        
+        java-version: '17'
+        distribution: 'temurin'
+    
     - name: Create required files
       run: |
-        # إنشاء الملفات المطلوبة
         mkdir -p app/src/main/res/raw
-        echo "dummy audio file" > app/src/main/res/raw/love_song.mp3
+        echo "dummy" > app/src/main/res/raw/love_song.mp3
         
-        # إنشاء أيقونات مؤقتة
         mkdir -p app/src/main/res/mipmap-hdpi
         mkdir -p app/src/main/res/mipmap-mdpi
         mkdir -p app/src/main/res/mipmap-xhdpi
@@ -55,38 +37,21 @@ jobs:
         mkdir -p app/src/main/res/mipmap-xxxhdpi
         
         for folder in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><vector/>" > "app/src/main/res/mipmap-$folder/ic_launcher.xml"
-          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><vector/>" > "app/src/main/res/mipmap-$folder/ic_launcher_round.xml"
+          echo '<vector xmlns:android="http://schemas.android.com/apk/res/android"></vector>' > "app/src/main/res/mipmap-$folder/ic_launcher.xml"
         done
-        
-        # إنشاء local.properties
-        echo "sdk.dir=$(pwd)/android-sdk" > local.properties
         
     - name: Make gradlew executable
       run: chmod +x gradlew
-        
-    - name: Build the project
+    
+    - name: Build debug APK
       run: |
         ./gradlew clean
-        ./gradlew assembleDebug --stacktrace
-        
-    - name: Check results
-      run: |
-        echo "=== Checking build results ==="
-        if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
-          echo "✅ Build SUCCESS! APK generated."
-          ls -lh app/build/outputs/apk/debug/*.apk
-        else
-          echo "❌ Build FAILED!"
-          echo "Looking for error logs..."
-          find . -name "*.log" -type f | head -5
-          exit 1
-        fi
-        
+        ./gradlew assembleDebug
+    
     - name: Upload APK
-      if: success()
       uses: actions/upload-artifact@v4
       with:
         name: app-debug
         path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: error
 [file content end]
