@@ -1,13 +1,13 @@
 [file name]: .github/workflows/build.yml
 [file content begin]
-name: Android Build
+name: "Android Build"
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
 
 jobs:
   build:
@@ -20,34 +20,34 @@ jobs:
     - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
-        java-version: '17'
-        distribution: 'temurin'
+        java-version: "17"
+        distribution: "temurin"
         
-    - name: Setup Android SDK
+    - name: Setup Android environment
       run: |
-        # تثبيت Android SDK Command Line Tools
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        # تثبيت Android SDK
+        sudo apt-get update
+        sudo apt-get install -y wget unzip
+        
+        # تحميل Android SDK Command Line Tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
         unzip -q commandlinetools-linux-*.zip -d android-sdk
         rm commandlinetools-linux-*.zip
         
-        # إنشاء المجلدات المطلوبة
+        # إعداد المسار
         mkdir -p android-sdk/cmdline-tools/latest
         mv android-sdk/cmdline-tools/* android-sdk/cmdline-tools/latest/
-        
-        # إضافة إلى PATH
-        echo "$(pwd)/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-        echo "$(pwd)/android-sdk/platform-tools" >> $GITHUB_PATH
         
         # قبول التراخيص
         yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
         
-    - name: Prepare project files
+    - name: Create required files
       run: |
-        # إنشاء الملفات المفقودة
+        # إنشاء الملفات المطلوبة
         mkdir -p app/src/main/res/raw
-        echo "dummy" > app/src/main/res/raw/love_song.mp3
+        echo "dummy audio file" > app/src/main/res/raw/love_song.mp3
         
-        # إنشاء أيقونات
+        # إنشاء أيقونات مؤقتة
         mkdir -p app/src/main/res/mipmap-hdpi
         mkdir -p app/src/main/res/mipmap-mdpi
         mkdir -p app/src/main/res/mipmap-xhdpi
@@ -55,47 +55,38 @@ jobs:
         mkdir -p app/src/main/res/mipmap-xxxhdpi
         
         for folder in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-          echo "<vector></vector>" > "app/src/main/res/mipmap-$folder/ic_launcher.xml"
-          echo "<vector></vector>" > "app/src/main/res/mipmap-$folder/ic_launcher_round.xml"
+          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><vector/>" > "app/src/main/res/mipmap-$folder/ic_launcher.xml"
+          echo "<?xml version=\"1.0\" encoding=\"utf-8\"?><vector/>" > "app/src/main/res/mipmap-$folder/ic_launcher_round.xml"
         done
         
-        # تأكد من وجود ملف gradle wrapper
-        if [ ! -f "gradlew" ]; then
-          echo "gradlew not found, downloading..."
-          wget -q https://raw.githubusercontent.com/gradle/gradle/master/gradlew
-          chmod +x gradlew
-        fi
-        
-        # إنشاء ملف local.properties
+        # إنشاء local.properties
         echo "sdk.dir=$(pwd)/android-sdk" > local.properties
         
     - name: Make gradlew executable
-      run: chmod +x gradlew || true
+      run: chmod +x gradlew
         
-    - name: Build with Gradle
+    - name: Build the project
       run: |
-        # تنظيف أولاً
-        ./gradlew clean --no-daemon
+        ./gradlew clean
+        ./gradlew assembleDebug --stacktrace
         
-        # بناء نسخة debug
-        ./gradlew assembleDebug --no-daemon --stacktrace
-        
-    - name: List generated APKs
+    - name: Check results
       run: |
-        echo "=== Generated APKs ==="
-        find . -name "*.apk" -type f | while read file; do
-          echo "APK found: $file"
-          ls -lh "$file"
-        done
-        
-        echo "=== Build directory ==="
-        ls -la app/build/outputs/apk/ || echo "No APK directory found"
+        echo "=== Checking build results ==="
+        if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+          echo "✅ Build SUCCESS! APK generated."
+          ls -lh app/build/outputs/apk/debug/*.apk
+        else
+          echo "❌ Build FAILED!"
+          echo "Looking for error logs..."
+          find . -name "*.log" -type f | head -5
+          exit 1
+        fi
         
     - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: ZozetyLove-APK
+        name: app-debug
         path: app/build/outputs/apk/debug/*.apk
-        retention-days: 7
 [file content end]
