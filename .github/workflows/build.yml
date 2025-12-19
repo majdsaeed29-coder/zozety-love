@@ -1,134 +1,31 @@
-name: Build Android APK
+name: Quick Android Build
 
 on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
-    # 1. جلب الكود فقط
     - uses: actions/checkout@v4
     
-    # 2. 🔥 تثبيت Android SDK + Java + Gradle
-    - name: Setup Android Environment
+    - name: Simple Build
       run: |
-        # تثبيت كلشي دفعة واحدة
+        # تثبيت الأدوات
         sudo apt update
-        sudo apt install -y openjdk-17-jdk gradle wget unzip
+        sudo apt install -y gradle
         
-        # نزل وتثبيت Android SDK Command Line Tools
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        unzip -q commandlinetools-linux-*.zip
-        mkdir -p android-sdk/cmdline-tools
-        mv cmdline-tools android-sdk/cmdline-tools/latest
-        
-        export ANDROID_HOME=$PWD/android-sdk
-        export PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin
-        
-        # قبول التراخيص
-        yes | sdkmanager --licenses 2>/dev/null || true
-        
-        echo "✅ Android SDK installed"
-    
-    # 3. 🔥 إصلاح الملفات الناقصة (السبب)
-    - name: Fix Android Project
-      run: |
-        echo "=== Fixing Android project structure ==="
-        
-        # 1. تأكد من وجود build.gradle في الجذر
-        if [ ! -f "build.gradle" ]; then
-          cat > build.gradle << 'EOF'
-          buildscript {
-              ext.kotlin_version = '1.9.0'
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-              dependencies {
-                  classpath 'com.android.tools.build:gradle:8.1.0'
-                  classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
-              }
-          }
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
-          task clean(type: Delete) {
-              delete rootProject.buildDir
-          }
-          EOF
-          echo "✅ Created root build.gradle"
-        fi
-        
-        # 2. ملف raw للموسيقى (ضروري)
+        # إصلاح الملفات
         mkdir -p app/src/main/res/raw
-        echo "# Dummy audio" > app/src/main/res/raw/love_song.mp3
+        echo "dummy" > app/src/main/res/raw/love_song.mp3
         
-        # 3. ملف خلفية الأيقونة
-        mkdir -p app/src/main/res/drawable
-        cat > app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
-        <?xml version="1.0" encoding="utf-8"?>
-        <shape xmlns:android="http://schemas.android.com/apk/res/android"
-            android:shape="rectangle">
-            <solid android:color="@color/primary_color" />
-        </shape>
-        EOF
-        
-        echo "✅ Android project files fixed"
-    
-    # 4. 🔥 البناء الفعلي (هون بيبلش يبني)
-    - name: Build Android APK
-      run: |
-        echo "=== STARTING ANDROID BUILD ==="
-        
-        # تأكد من وجود Gradle
-        if ! command -v gradle &> /dev/null; then
-          echo "Installing Gradle..."
-          sudo apt install -y gradle
-        fi
-        
-        # اذهب لمجلد app وابنِ
+        # البناء
         cd app
+        gradle assembleDebug
         
-        # نظف أولاً
-        gradle clean 2>/dev/null || true
-        
-        # اختبار إذا المشروع جاهز
-        echo "1. Testing project structure..."
-        ls -la
-        ls -la src/main/
-        
-        # البناء مع عرض كلشي
-        echo "2. Building APK..."
-        gradle assembleDebug --stacktrace 2>&1 | tee build_output.log
-        
-        # تحقق من النتيجة
-        if grep -q "BUILD SUCCESSFUL" build_output.log; then
-          echo "🎉 🎉 🎉 ANDROID BUILD SUCCESSFUL! 🎉 🎉 🎉"
+        # النتيجة
+        if [ $? -eq 0 ]; then
+          echo "Build succeeded"
+          find . -name "*.apk" -type f
         else
-          echo "❌ Build failed"
-          echo "=== Last 50 lines ==="
-          tail -50 build_output.log
+          echo "Build failed"
         fi
-        
-        # ابحث عن APK
-        echo "=== Searching for APK ==="
-        APK_FILE=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
-        if [ -n "$APK_FILE" ]; then
-          echo "✅ APK Found: $APK_FILE"
-          echo "APK_PATH=$APK_FILE" >> $GITHUB_ENV
-          ls -lh "$APK_FILE"
-        else
-          echo "❌ No APK found"
-        fi
-    
-    # 5. رفع APK إذا وجد
-    - name: Upload Android APK
-      if: env.APK_PATH != ''
-      uses: actions/upload-artifact@v4
-      with:
-        name: zozety-android.apk
-        path: ${{ env.APK_PATH }}
