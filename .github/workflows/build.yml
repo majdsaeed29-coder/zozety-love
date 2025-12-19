@@ -1,73 +1,49 @@
-name: Build Zozety Love
-on: [workflow_dispatch, push]
+[file name]: .github/workflows/build.yml
+name: Android Build
+
+on: [workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    
+    runs-on: ubuntu-latest
+
     steps:
-    # 1. جلب المشروع
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
-      
-    # 2. إعداد Java
-    - name: Setup Java
+
+    - name: Set up JDK 17
       uses: actions/setup-java@v3
       with:
         java-version: '17'
-        distribution: 'zulu'
-      
-    # 3. إنشاء الملفات المفقودة من أكوادك
-    - name: Create Required Files
+        distribution: 'temurin'
+
+    - name: Create Essential Files
       run: |
-        # أنشئ مجلد raw للصوت
+        # الملفات التي ذكرت أنها ضرورية للبناء
         mkdir -p app/src/main/res/raw
-        echo "Dummy audio file for build" > app/src/main/res/raw/love_song.mp3
-        
-        # أنشئ ملف local.properties بسيط
-        echo "sdk.dir=/usr/local/lib/android/sdk" > local.properties
-        
-        # أنشئ أيقونات وهمية
-        for d in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-          mkdir -p "app/src/main/res/mipmap-$d"
-          echo '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android"><path android:fillColor="#FF0000"/></vector>' > "app/src/main/res/mipmap-$d/ic_launcher.xml"
-        done
-        
-        echo "✅ All required files created"
-      
-    # 4. البناء باستخدام Gradle مباشرة
-    - name: Build APK
+        echo "dummy" > app/src/main/res/raw/love_song.mp3
+
+        mkdir -p app/src/main/res/drawable
+        mkdir -p app/src/main/res/values
+        mkdir -p app/src/main/res/layout
+
+    - name: Prepare Gradle Wrapper
       run: |
-        # تثبيت Gradle
-        sudo apt-get update
-        sudo apt-get install -y gradle-8.5 || sudo apt-get install -y gradle
-        
-        # البناء
-        echo "Starting build..."
-        cd app
-        gradle clean
-        gradle assembleDebug 2>&1 | tail -100
-        
-        echo "Build finished!"
-        
-    # 5. عرض النتيجة
-    - name: Show Result
-      run: |
-        echo "=== BUILD RESULT ==="
-        APK=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
-        
-        if [ -n "$APK" ]; then
-          echo "🎉 SUCCESS! APK created at: $APK"
-          ls -lh "$APK"
+        # التأكد من وجود ملف Gradle Wrapper التنفيذي الصحيح
+        if [ -f gradlew ]; then
+          chmod +x gradlew
+          echo "✅ gradlew exists and is executable."
         else
-          echo "⚠️ No APK found. Checking build directory..."
-          ls -la app/build/outputs/ 2>/dev/null || echo "No outputs directory"
+          echo "❌ gradlew not found. Workflow will likely fail."
         fi
-        
-    # 6. رفع النتيجة إذا نجح
-    - name: Upload APK
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: Zozety-Love-APK
-        path: app/build/outputs/apk/debug/*.apk
+
+    - name: Clean Project
+      run: ./gradlew clean --no-daemon
+
+    - name: Assemble Debug APK
+      run: ./gradlew assembleDebug --no-daemon --stacktrace
+
+    - name: List APK Artifacts
+      run: |
+        echo "Searching for APK files..."
+        find . -name "*.apk" -type f
