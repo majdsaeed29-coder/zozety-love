@@ -1,4 +1,3 @@
-[file name]: .github/workflows/build.yml
 name: Build Zozety Love
 on: [workflow_dispatch, push]
 
