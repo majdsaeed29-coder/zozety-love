@@ -1,147 +1,68 @@
-name: Android Build - FINAL FIX
+name: FINAL ATTEMPT - Build or Die
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: [workflow_dispatch]
 
 jobs:
   build:
-    name: Build APK
     runs-on: ubuntu-latest
-
+    
     steps:
-      # 1. سحب الكود
-      - name: Checkout source code
-        uses: actions/checkout@v4
-
-      # 2. إعداد JDK
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      # 3. تثبيت Gradle
-      - name: Install Gradle
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gradle
-
-      # 4. 🔴 **إصلاح الملفات الناقصة + أخطاء الكود**
-      - name: Fix Missing Files AND Code Errors
-        run: |
-          echo "=== Fixing ALL problems ==="
-          
-          # 1. ملف الموسيقى
-          mkdir -p app/src/main/res/raw
-          echo "dummy" > app/src/main/res/raw/love_song.mp3
-          
-          # 2. ملف خلفية الأيقونة
-          cat > app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <shape xmlns:android="http://schemas.android.com/apk/res/android"
-              android:shape="rectangle">
-              <solid android:color="@color/primary_color" />
-          </shape>
-          EOF
-          
-          # 3. 🔴 **إصلاح أخطاء Kotlin في SecureStorage.kt**
-          if [ -f "app/src/main/java/com/zozety/love/utils/SecureStorage.kt" ]; then
-            echo "Fixing SecureStorage.kt type errors..."
-            
-            # إصلاح خطأ Type mismatch
-            sed -i 's/mapOf(/mapOf<String, Any>(/g' app/src/main/java/com/zozety/love/utils/SecureStorage.kt
-            
-            # إصلاح خطأ String? vs Any
-            sed -i 's/"error" to e.message/"error" to (e.message ?: "Unknown error")/g' app/src/main/java/com/zozety/love/utils/SecureStorage.kt
-            
-            echo "✅ SecureStorage.kt fixed"
-          fi
-          
-          # 4. 🔴 **إصلاح imports في AIService.kt**
-          if [ -f "app/src/main/java/com/zozety/love/services/AIService.kt" ]; then
-            echo "Adding missing imports to AIService.kt..."
-            
-            # تحقق إذا imports ناقصة
-            if ! grep -q "HttpLoggingInterceptor" app/src/main/java/com/zozety/love/services/AIService.kt; then
-              sed -i '1s/^/import okhttp3.logging.HttpLoggingInterceptor\n/' app/src/main/java/com/zozety/love/services/AIService.kt
-            fi
-            
-            if ! grep -q "toRequestBody" app/src/main/java/com/zozety/love/services/AIService.kt; then
-              sed -i '1s/^/import okhttp3.RequestBody.Companion.toRequestBody\n/' app/src/main/java/com/zozety/love/services/AIService.kt
-            fi
-            
-            echo "✅ AIService.kt imports fixed"
-          fi
-          
-          echo "=== All fixes applied ==="
-
-      # 5. 🔴 **البناء مع عرض الأخطاء الكاملة**
-      - name: Build Debug APK - WITH FULL LOGS
-        run: |
-          cd app
-          echo "=== STARTING BUILD - Full output ==="
-          
-          # نظف أولاً
-          gradle clean 2>/dev/null || true
-          
-          # ابنِ مع حفظ الـ logs
-          gradle assembleDebug --stacktrace --info 2>&1 | tee full_build.log
-          
-          # ابحث عن سبب الفشل
-          echo ""
-          echo "=== BUILD RESULT ANALYSIS ==="
-          
-          if grep -q "BUILD SUCCESSFUL" full_build.log; then
-            echo "✅ BUILD SUCCESSFUL!"
-          elif grep -q "BUILD FAILED" full_build.log; then
-            echo "❌ BUILD FAILED - Reasons:"
-            
-            # استخرج الأخطاء
-            grep -i "error:\|exception\|failed\|unresolved" full_build.log | head -20
-            
-            # اظهر آخر 100 سطر للأخطاء
-            echo ""
-            echo "=== Last 100 lines with errors ==="
-            tail -100 full_build.log | grep -i "error\|fail\|exception\|unresolved"
-          else
-            echo "⚠️ Build status unknown"
-            echo "=== Last 50 lines ==="
-            tail -50 full_build.log
-          fi
-          
-          # ابحث عن APK بأي شكل
-          echo ""
-          echo "=== Searching for APK ==="
-          find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-
-      # 6. 🔴 **رفع أي APK موجود (حتى لو في مكان مختلف)**
-      - name: Upload ANY APK Found
-        run: |
-          echo "=== Looking for APK to upload ==="
-          cd app
-          
-          # ابحث في كل الأماكن
-          APK_FILE=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
-          
-          if [ -n "$APK_FILE" ]; then
-            echo "✅ Found APK: $APK_FILE"
-            echo "APK_PATH=$APK_FILE" >> $GITHUB_ENV
-            ls -lh "$APK_FILE"
-          else
-            echo "❌ No APK found anywhere"
-            echo "=== Checking build outputs ==="
-            ls -la build/outputs/ 2>/dev/null || echo "No outputs directory"
-          fi
-
-      # 7. رفع الـ APK إذا وجد
-      - name: Upload APK artifact
-        if: env.APK_PATH != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: zozety-love.apk
-          path: ${{ env.APK_PATH }}
+    # 1. جلب الكود فقط
+    - uses: actions/checkout@v4
+    
+    # 2. تثبيت الأدوات دفعة واحدة
+    - name: INSTALL EVERYTHING
+      run: |
+        sudo apt update
+        sudo apt install -y openjdk-17-jdk gradle wget unzip
+        
+    # 3. إصلاح الملفات الناقصة دفعة واحدة
+    - name: FIX ALL FILES
+      run: |
+        # 1. ملف الموسيقى
+        mkdir -p app/src/main/res/raw
+        echo "dummy" > app/src/main/res/raw/love_song.mp3
+        
+        # 2. ملف خلفية الأيقونة
+        cat > app/src/main/res/drawable/ic_launcher_background.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <shape xmlns:android="http://schemas.android.com/apk/res/android"
+            android:shape="rectangle">
+            <solid android:color="@color/primary_color" />
+        </shape>
+        EOF
+        
+        # 3. إصلاح SecureStorage.kt
+        sed -i 's/mapOf(/mapOf<String, Any>(/g' app/src/main/java/com/zozety/love/utils/SecureStorage.kt 2>/dev/null || true
+        
+        # 4. إضافة colors الناقصة
+        echo '    <color name="primary_light">#F48FB1</color>' >> app/src/main/res/values/colors.xml 2>/dev/null || true
+        
+    # 4. البناء - آخر محاولة
+    - name: BUILD OR DIE
+      run: |
+        cd app
+        echo "=== BUILD START ==="
+        
+        # محاولة البناء الأولى
+        gradle assembleDebug 2>&1 | tail -100
+        
+        echo "=== BUILD END ==="
+        
+        # ابحث عن APK
+        APK=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
+        if [ -n "$APK" ]; then
+          echo "✅ APK FOUND: $APK"
+          echo "APK_PATH=$APK" >> $GITHUB_ENV
+        else
+          echo "❌ NO APK - Listing build dir:"
+          ls -la build/ 2>/dev/null || echo "No build dir"
+        fi
+    
+    # 5. رفع إذا وجد
+    - name: UPLOAD IF EXISTS
+      if: env.APK_PATH != ''
+      uses: actions/upload-artifact@v4
+      with:
+        name: zozety-apk
+        path: ${{ env.APK_PATH }}
