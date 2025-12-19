@@ -1,12 +1,150 @@
-name: Build
-on: workflow_dispatch
+name: Nuclear Build
+on: 
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
 jobs:
-  build:
+  nuclear-build:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-      - run: sudo apt update && sudo apt install -y gradle
-      - run: |
-          mkdir -p app/src/main/res/raw
-          echo "dummy" > app/src/main/res/raw/love_song.mp3
-      - run: gradle clean && gradle assembleDebug
+    # 1. جيب الشغل
+    - name: 🔥 Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    # 2. جهز الجافا
+    - name: ⚡ Setup Java 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: gradle
+    
+    # 3. جهز الدرايفر تبع اندرويد
+    - name: 🛠️ Setup Android SDK
+      run: |
+        # اجيب الـSDK من تحت الأرض
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
+        unzip -q commandlinetools-linux-*.zip -d android-sdk
+        rm commandlinetools-linux-*.zip
+        
+        mkdir -p android-sdk/cmdline-tools/latest
+        mv android-sdk/cmdline-tools/* android-sdk/cmdline-tools/latest/
+        
+        echo "$(pwd)/android-sdk" >> $GITHUB_PATH
+        echo "$(pwd)/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        
+        yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+    
+    # 4. شوف وين المشكلة
+    - name: 🔍 Debug Project
+      run: |
+        echo "=== المشروع قبل ما نبلش ==="
+        ls -la
+        echo ""
+        echo "=== ملفات غرادل ==="
+        find . -name "*.gradle*" -o -name "gradle*" | sort
+        echo ""
+        echo "=== محتوى app/build.gradle ==="
+        head -50 app/build.gradle || echo "ما في app/build.gradle"
+    
+    # 5. سوي الملفات الناقصة
+    - name: 🛠️ Fix Missing Files
+      run: |
+        # ملف الصوت
+        mkdir -p app/src/main/res/raw
+        echo "DUMMY_AUDIO_FILE" > app/src/main/res/raw/love_song.mp3
+        
+        # أيقونات
+        for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+          mkdir -p "app/src/main/res/mipmap-$density"
+          echo '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android"></vector>' > "app/src/main/res/mipmap-$density/ic_launcher.xml"
+        done
+        
+        # local.properties
+        echo "sdk.dir=$(pwd)/android-sdk" > local.properties
+        echo "ndk.dir=$(pwd)/android-sdk/ndk" >> local.properties
+        
+        echo "✅ الملفات جاهزة"
+    
+    # 6. امسح كلشي وابدا من جديد
+    - name: 🧹 Clean Everything
+      run: |
+        rm -rf ~/.gradle/caches || true
+        rm -rf .gradle || true
+        rm -rf build || true
+        rm -rf app/build || true
+        
+    # 7. البناء النووي
+    - name: 💣 Nuclear Build
+      run: |
+        echo "=== بداية البناء ==="
+        
+        # خيار 1: جرب مع غرادل من النظام
+        if command -v gradle &> /dev/null; then
+          echo "🚀 جرب مع gradle من النظام"
+          gradle --version
+          gradle clean || echo "clean فشل"
+          gradle assembleDebug --stacktrace --no-daemon || echo "البناء فشل"
+        fi
+        
+        # خيار 2: لو gradle مش موجود، حملو
+        echo "📦 حمل gradle 8.5"
+        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+        unzip -q gradle-8.5-bin.zip
+        export PATH="$PWD/gradle-8.5/bin:$PATH"
+        
+        echo "🔄 جرب تاني"
+        gradle --version
+        gradle clean
+        gradle assembleDebug --stacktrace --no-daemon
+        
+        echo "✅ البناء انتهى"
+    
+    # 8. شوف وين الـAPK
+    - name: 🔎 Find APK
+      run: |
+        echo "=== دور على الـAPK ==="
+        
+        APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null)
+        APK_COUNT=$(echo "$APK_FILES" | wc -w)
+        
+        if [ "$APK_COUNT" -gt 0 ]; then
+          echo "🎉 لقينا $APK_COUNT APK!"
+          for apk in $APK_FILES; do
+            echo "📱 $apk - $(ls -lh "$apk" | awk '{print $5}')"
+          done
+        else
+          echo "😡 ما في APK! شوف شو صار:"
+          ls -la app/build/outputs/ 2>/dev/null || echo "ما في outputs"
+          ls -la app/build/ 2>/dev/null || echo "ما في build"
+        fi
+    
+    # 9. ارفع النتيجة إذا نجحت
+    - name: 🚀 Upload APK
+      if: success()
+      uses: actions/upload-artifact@v4
+      with:
+        name: ZozetyLove-APK
+        path: |
+          app/build/outputs/apk/debug/*.apk
+          app/build/outputs/apk/release/*.apk
+        if-no-files-found: error
+    
+    # 10. إذا فشل، اعطيني سبب الفشل
+    - name: 📋 Failure Report
+      if: failure()
+      run: |
+        echo "=== تقرير الفشل ==="
+        echo "آخر 100 سطر من الـlog:"
+        tail -100 /tmp/gradle_build.log 2>/dev/null || echo "ما في log"
+        
+        echo ""
+        echo "=== ملفات المشروع بعد البناء ==="
+        find . -name "*.log" -type f | head -5
