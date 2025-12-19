@@ -72,4 +72,3 @@ jobs:
       with:
         name: Zozety-Love-APK
         path: app/build/outputs/apk/debug/*.apk
-[file content end]
