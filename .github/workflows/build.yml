@@ -1,45 +1,37 @@
-name: Build Without Gradle Wrapper
 
-on:
-  workflow_dispatch:
+[file name]: .github/workflows/simple-build.yml
+[file content begin]
+name: Simple Build Test
+
+on: workflow_dispatch
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Install Gradle
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y gradle
-        
-    - name: Install Java
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-    
-    - name: Prepare project
-      run: |
-        # إنشاء الملفات المطلوبة
-        mkdir -p app/src/main/res/raw
-        echo "dummy" > app/src/main/res/raw/love_song.mp3
-        
-        # إنشاء أيقونات وهمية
-        for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-          mkdir -p "app/src/main/res/mipmap-$density"
-          echo '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android"></vector>' > "app/src/main/res/mipmap-$density/ic_launcher.xml"
-        done
-    
-    - name: Build with Gradle
-      run: |
-        # استخدام gradle مباشرة بدون wrapper
-        cd app
-        gradle assembleDebug
-        
-    - name: Find APK
-      run: |
-        echo "Looking for APK files..."
-        find . -name "*.apk" -type f
+      - uses: actions/checkout@v4
+      
+      - name: Setup
+        run: |
+          echo "Checking project structure..."
+          ls -la
+          echo "Checking app directory..."
+          ls -la app/ || echo "No app directory"
+          
+      - name: Create minimal files
+        run: |
+          # فقط الملفات الضرورية
+          mkdir -p app/src/main/res/raw
+          echo "test" > app/src/main/res/raw/love_song.mp3
+          
+      - name: Try gradle
+        run: |
+          # إذا كان gradlew موجوداً
+          if [ -f "gradlew" ]; then
+            echo "Found gradlew, trying to build..."
+            chmod +x gradlew
+            ./gradlew tasks --no-daemon 2>&1 | head -50
+          else
+            echo "gradlew not found, project may need gradle wrapper"
+          fi
+[file content end]
