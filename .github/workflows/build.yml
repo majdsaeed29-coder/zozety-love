@@ -1,6 +1,3 @@
-
-[file name]: .github/workflows/simple-build.yml
-
 name: Simple Build Test
 
 on: workflow_dispatch
