@@ -4,60 +4,39 @@ on: [workflow_dispatch, push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
-    - name: 📥 Get code
-      uses: actions/checkout@v4
-    
-    - name: ☕ Setup Java
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: 🛠️ Prepare project
-      run: |
-        # فقط الملفات الضرورية
-        mkdir -p app/src/main/res/raw
-        echo "audio file" > app/src/main/res/raw/love_song.mp3
-        
-        # لا تنشئ local.properties - يسبب مشاكل
-        echo "Project prepared"
-    
-    - name: 🏗️ Build with Android tools
-      run: |
-        # تثبيت الأدوات المطلوبة
-        sudo apt-get update
-        sudo apt-get install -y android-sdk
-        
-        # بناء المشروع
-        cd app
-        gradle clean
-        gradle assembleDebug --stacktrace 2>&1 | tail -100
-        
-        echo "Build finished"
-    
-    - name: 📱 Find APK
-      run: |
-        echo "=== Searching for APK ==="
-        
-        # ابحث عن الـAPK في أي مكان
-        APK_FILE=$(find . -name "*.apk" -type f 2>/dev/null | head -1)
-        
-        if [ -n "$APK_FILE" ]; then
-          echo "✅ Found APK: $APK_FILE"
-          ls -lh "$APK_FILE"
-          echo ""
-          echo "APK size: $(du -h "$APK_FILE" | cut -f1)"
-        else
-          echo "⚠️ No APK found, checking build output..."
-          ls -la app/build/outputs/ 2>/dev/null || echo "No outputs directory"
-        fi
-    
-    - name: 📤 Upload result
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: Zozety-App
-        path: app/build/outputs/apk/debug/*.apk
-        if-no-files-found: warn
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ☕ Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle # هذا يساعد في تسريع البناء
+
+      - name: 🛠️ Setup Android SDK (Automated)
+        uses: android-actions/setup-android@v3
+        with:
+          # سيتم تنزيل الأدوات المناسبة تلقائياً. لإصدارات حديثة.
+          cmdline-tools-version: '11.0' # أو 'latest'[citation:7]
+
+      - name: 🔨 Prepare Project Files
+        run: |
+          mkdir -p app/src/main/res/raw
+          echo "dummy audio" > app/src/main/res/raw/love_song.mp3
+          echo "✅ Essential files ready"
+
+      - name: 🏗️ Build the App
+        run: |
+          # استخدم `gradlew` الخاص بمشروعك، أو قم بإنشاء واحد بسيط إذا لم يكن موجوداً.
+          # سيستخدم Gradle الأداة التي تم إعدادها في الخطوة السابقة.
+          ./gradlew clean assembleDebug --stacktrace
+
+      - name: 📦 Upload APK Artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Zozety-Love-APK
+          path: app/build/outputs/apk/debug/*.apk
