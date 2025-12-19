@@ -1,5 +1,5 @@
-[file name]: .github/workflows/build.yml
-name: Android Build
+[file name]: .github/workflows/ultimate-build.yml
+name: Ultimate Android Build
 on: workflow_dispatch
 
 jobs:
@@ -7,128 +7,79 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+    # الخطوة 1: جلب الأكواد
+    - uses: actions/checkout@v4
     
-    - name: Generate Gradle Wrapper
+    # الخطوة 2: تثبيت الأدوات الأساسية
+    - name: Install tools
       run: |
-        # 1. تثبيت Gradle
-        sudo apt-get update
-        sudo apt-get install -y gradle
-        
-        # 2. إنشاء gradlew wrapper
-        echo "Generating gradle wrapper..."
-        cat > gradlew << 'EOF'
-#!/usr/bin/env bash
-##############################################################################
-##  Gradle start up script for UN*X
-##############################################################################
-# Add default JVM options here
-# Resolve links: $0 may be a link
-while [ -h "$PRG" ] ; do
-  ls=$(ls -ld "$PRG")
-  link=$(expr "$ls" : '.*-> \(.*\)$')
-  if expr "$link" : '/.*' > /dev/null; then
-    PRG="$link"
-  else
-    PRG=$(dirname "$PRG")"/$link"
-  fi
-done
-SCRIPT=$(readlink -f "$0")
-SCRIPTPATH=$(dirname "$SCRIPT")
-APP_HOME=$(cd "$SCRIPTPATH/.." && pwd)
-exec "$JAVA_HOME/bin/java" $DEFAULT_JVM_OPTS -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$@"
-EOF
-        
-        chmod +x gradlew
-        
-        # 3. إنشاء مجلد wrapper وملف gradle-wrapper.properties
-        mkdir -p gradle/wrapper
-        
-        cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.5-bin.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-EOF
-        
-        # 4. تحميل gradle-wrapper.jar
-        wget -q https://github.com/gradle/gradle/raw/master/gradle/wrapper/gradle-wrapper.jar -P gradle/wrapper/ || true
-        
-        echo "✅ Gradle wrapper created"
+        sudo apt update
+        sudo apt install -y wget unzip openjdk-17-jdk
     
-    - name: Set up Java
-      uses: actions/setup-java@v3
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Create missing files
+    # الخطوة 3: إنشاء هيكل المشروع من أكوادك
+    - name: Setup project structure
       run: |
-        # إنشاء جميع الملفات المطلوبة من أكوادك
-        echo "Creating project structure..."
+        # فقط أنشئ الملفات الضرورية جداً
+        mkdir -p app/src/main/res/raw
+        echo "dummy" > app/src/main/res/raw/love_song.mp3
         
-        # 1. مجلدات الموارد
-        mkdir -p app/src/main/res/{drawable,layout,values,raw,mipmap-hdpi,mipmap-mdpi,mipmap-xhdpi,mipmap-xxhdpi,mipmap-xxxhdpi}
-        
-        # 2. ملف الصوت
-        echo "dummy audio" > app/src/main/res/raw/love_song.mp3
-        
-        # 3. الأيقونات البسيطة
-        for density in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-          echo '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android"></vector>' > "app/src/main/res/mipmap-$density/ic_launcher.xml"
-          echo '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android"></vector>' > "app/src/main/res/mipmap-$density/ic_launcher_round.xml"
-        done
-        
-        # 4. ملف colors.xml إذا لم يكن موجوداً
-        if [ ! -f "app/src/main/res/values/colors.xml" ]; then
-          cat > app/src/main/res/values/colors.xml << 'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <color name="primary_color">#E91E63</color>
-</resources>
+        # ملف build.gradle الأساسي إذا كان ناقصاً
+        if [ ! -f "app/build.gradle" ]; then
+          echo "Creating minimal build.gradle..."
+          cat > app/build.gradle << 'EOF'
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.zozety.love'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.zozety.love"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}
 EOF
         fi
-        
-        echo "✅ Project files created"
     
-    - name: Build the project
+    # الخطوة 4: بناء باستخدام Gradle مباشرة بدون wrapper
+    - name: Direct Gradle Build
       run: |
-        echo "Starting build process..."
+        echo "Downloading Gradle..."
+        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+        unzip -q gradle-8.5-bin.zip
+        export PATH=$PWD/gradle-8.5/bin:$PATH
         
-        # محاولة البناء
-        if [ -f "gradlew" ]; then
-          ./gradlew clean
-          ./gradlew assembleDebug --stacktrace --no-daemon
+        echo "Building with Gradle..."
+        gradle clean
+        gradle assembleDebug
+        
+        echo "Checking results..."
+        ls -la app/build/outputs/apk/debug/ 2>/dev/null || echo "No debug APK"
+    
+    # الخطوة 5: النتيجة النهائية
+    - name: Final Check
+      run: |
+        echo "=== BUILD FINISHED ==="
+        if [ -f "app/build/outputs/apk/debug/app-debug.apk" ]; then
+          echo "🎉 SUCCESS! APK created."
+          du -h app/build/outputs/apk/debug/app-debug.apk
         else
-          # استخدام gradle مباشرة
-          gradle clean
-          gradle assembleDebug --stacktrace
+          echo "⚠️ Build may have issues, but process completed."
+          find . -name "*.apk" -type f 2>/dev/null || echo "No APKs generated"
         fi
-        
-        echo "Build completed!"
-    
-    - name: Check APK
-      run: |
-        echo "🔍 Searching for APK files..."
-        
-        if find . -name "*.apk" -type f 2>/dev/null | grep -q .; then
-          echo "✅ APK found!"
-          find . -name "*.apk" -type f | head -5
-          ls -lh $(find . -name "*.apk" -type f | head -1) 2>/dev/null || true
-        else
-          echo "⚠️ No APK found, checking build output..."
-          ls -la app/build/outputs/ 2>/dev/null || echo "No build outputs"
-        fi
-    
-    - name: Upload APK
-      if: success()
-      uses: actions/upload-artifact@v4
-      with:
-        name: zozety-love-apk
-        path: |
-          app/build/outputs/apk/debug/*.apk
-          app/build/outputs/apk/release/*.apk
-        if-no-files-found: warn
 [file content end]
