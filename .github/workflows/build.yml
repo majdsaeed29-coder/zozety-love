@@ -1,5 +1,4 @@
 [file name]: .github/workflows/build.yml
-[file content begin]
 name: Android Build
 on: workflow_dispatch
 
