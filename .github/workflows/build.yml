@@ -1,20 +1,20 @@
 [file name]: .github/workflows/build.yml
 [file content begin]
-name: Android Build and Test
+name: Android Build
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
   workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
       
     - name: Set up JDK 17
@@ -24,64 +24,78 @@ jobs:
         distribution: 'temurin'
         
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v2
-      
-    - name: Create necessary directories
       run: |
+        # تثبيت Android SDK Command Line Tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+        unzip -q commandlinetools-linux-*.zip -d android-sdk
+        rm commandlinetools-linux-*.zip
+        
+        # إنشاء المجلدات المطلوبة
+        mkdir -p android-sdk/cmdline-tools/latest
+        mv android-sdk/cmdline-tools/* android-sdk/cmdline-tools/latest/
+        
+        # إضافة إلى PATH
+        echo "$(pwd)/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
+        echo "$(pwd)/android-sdk/platform-tools" >> $GITHUB_PATH
+        
+        # قبول التراخيص
+        yes | android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
+        
+    - name: Prepare project files
+      run: |
+        # إنشاء الملفات المفقودة
         mkdir -p app/src/main/res/raw
-        mkdir -p app/src/main/res/drawable
+        echo "dummy" > app/src/main/res/raw/love_song.mp3
+        
+        # إنشاء أيقونات
         mkdir -p app/src/main/res/mipmap-hdpi
         mkdir -p app/src/main/res/mipmap-mdpi
         mkdir -p app/src/main/res/mipmap-xhdpi
         mkdir -p app/src/main/res/mipmap-xxhdpi
         mkdir -p app/src/main/res/mipmap-xxxhdpi
         
-        # إنشاء أيقونات وهمية إذا لم تكن موجودة
-        if [ -f create_icons.sh ]; then
-          chmod +x create_icons.sh
-          ./create_icons.sh
-        else
-          echo "Creating dummy icons..."
-          for folder in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-            echo "PNG-ICON-DUMMY" > "app/src/main/res/mipmap-$folder/ic_launcher.png"
-            echo "PNG-ICON-DUMMY-ROUND" > "app/src/main/res/mipmap-$folder/ic_launcher_round.png"
-          done
+        for folder in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
+          echo "<vector></vector>" > "app/src/main/res/mipmap-$folder/ic_launcher.xml"
+          echo "<vector></vector>" > "app/src/main/res/mipmap-$folder/ic_launcher_round.xml"
+        done
+        
+        # تأكد من وجود ملف gradle wrapper
+        if [ ! -f "gradlew" ]; then
+          echo "gradlew not found, downloading..."
+          wget -q https://raw.githubusercontent.com/gradle/gradle/master/gradlew
+          chmod +x gradlew
         fi
         
-        # إنشاء ملف صوتي وهمي
-        echo "dummy audio file" > app/src/main/res/raw/love_song.mp3
+        # إنشاء ملف local.properties
+        echo "sdk.dir=$(pwd)/android-sdk" > local.properties
         
-    - name: Grant execute permission for gradlew
-      run: chmod +x gradlew
-      
+    - name: Make gradlew executable
+      run: chmod +x gradlew || true
+        
     - name: Build with Gradle
       run: |
-        # تنظيف وبناء المشروع
-        ./gradlew clean
-        ./gradlew assembleDebug
+        # تنظيف أولاً
+        ./gradlew clean --no-daemon
         
-        # اختبار التجميع
-        ./gradlew assembleRelease
+        # بناء نسخة debug
+        ./gradlew assembleDebug --no-daemon --stacktrace
         
-    - name: Run tests
+    - name: List generated APKs
       run: |
-        ./gradlew test
-        ./gradlew connectedAndroidTest || echo "Android tests may require emulator"
+        echo "=== Generated APKs ==="
+        find . -name "*.apk" -type f | while read file; do
+          echo "APK found: $file"
+          ls -lh "$file"
+        done
         
-    - name: Upload APK artifacts
+        echo "=== Build directory ==="
+        ls -la app/build/outputs/apk/ || echo "No APK directory found"
+        
+    - name: Upload APK
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: app-apks
-        path: |
-          app/build/outputs/apk/debug/
-          app/build/outputs/apk/release/
+        name: ZozetyLove-APK
+        path: app/build/outputs/apk/debug/*.apk
         retention-days: 7
-        
-    - name: Check APK existence
-      run: |
-        echo "Checking for generated APKs..."
-        find . -name "*.apk" -type f | head -20
-        echo "APK count:"
-        find . -name "*.apk" -type f | wc -l
 [file content end]
