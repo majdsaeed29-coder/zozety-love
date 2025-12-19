@@ -1,6 +1,6 @@
 
 [file name]: .github/workflows/simple-build.yml
-[file content begin]
+
 name: Simple Build Test
 
 on: workflow_dispatch
@@ -34,4 +34,3 @@ jobs:
           else
             echo "gradlew not found, project may need gradle wrapper"
           fi
-[file content end]
