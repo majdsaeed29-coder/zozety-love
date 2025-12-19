@@ -1,13 +1,7 @@
-name: Android Build
+name: Build Without Gradle Wrapper
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build:
@@ -17,38 +11,35 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Set up JDK 17
+    - name: Install Gradle
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gradle
+        
+    - name: Install Java
       uses: actions/setup-java@v3
       with:
         java-version: '17'
-        distribution: 'temurin'
     
-    - name: Create required files
+    - name: Prepare project
       run: |
+        # إنشاء الملفات المطلوبة
         mkdir -p app/src/main/res/raw
         echo "dummy" > app/src/main/res/raw/love_song.mp3
         
-        mkdir -p app/src/main/res/mipmap-hdpi
-        mkdir -p app/src/main/res/mipmap-mdpi
-        mkdir -p app/src/main/res/mipmap-xhdpi
-        mkdir -p app/src/main/res/mipmap-xxhdpi
-        mkdir -p app/src/main/res/mipmap-xxxhdpi
-        
-        for folder in hdpi mdpi xhdpi xxhdpi xxxhdpi; do
-          echo '<vector xmlns:android="http://schemas.android.com/apk/res/android"></vector>' > "app/src/main/res/mipmap-$folder/ic_launcher.xml"
+        # إنشاء أيقونات وهمية
+        for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+          mkdir -p "app/src/main/res/mipmap-$density"
+          echo '<?xml version="1.0" encoding="utf-8"?><vector xmlns:android="http://schemas.android.com/apk/res/android"></vector>' > "app/src/main/res/mipmap-$density/ic_launcher.xml"
         done
-        
-    - name: Make gradlew executable
-      run: chmod +x gradlew
     
-    - name: Build debug APK
+    - name: Build with Gradle
       run: |
-        ./gradlew clean
-        ./gradlew assembleDebug
-    
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-debug
-        path: app/build/outputs/apk/debug/*.apk
-        if-no-files-found: error
+        # استخدام gradle مباشرة بدون wrapper
+        cd app
+        gradle assembleDebug
+        
+    - name: Find APK
+      run: |
+        echo "Looking for APK files..."
+        find . -name "*.apk" -type f
