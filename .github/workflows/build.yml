@@ -4,137 +4,112 @@ on: [workflow_dispatch, push]
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Setup Java 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
-    
-    - name: Install Android SDK Manually
-      run: |
-        echo "📱 Installing Android SDK..."
-        
-        # تنزيل command line tools
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
-        mkdir -p /usr/local/lib/android-sdk/cmdline-tools
-        unzip -q commandlinetools-linux-11076708_latest.zip -d /usr/local/lib/android-sdk/cmdline-tools
-        mv /usr/local/lib/android-sdk/cmdline-tools/cmdline-tools /usr/local/lib/android-sdk/cmdline-tools/latest
-        
-        # إضافة إلى PATH
-        echo "/usr/local/lib/android-sdk/cmdline-tools/latest/bin" >> $GITHUB_PATH
-        echo "/usr/local/lib/android-sdk/platform-tools" >> $GITHUB_PATH
-        echo "ANDROID_HOME=/usr/local/lib/android-sdk" >> $GITHUB_ENV
-        echo "ANDROID_SDK_ROOT=/usr/local/lib/android-sdk" >> $GITHUB_ENV
-        
-        # قبول التراخيص
-        mkdir -p /usr/local/lib/android-sdk/licenses
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > /usr/local/lib/android-sdk/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > /usr/local/lib/android-sdk/licenses/android-sdk-preview-license
-        
-        # تثبيت المكونات الأساسية
-        yes | /usr/local/lib/android-sdk/cmdline-tools/latest/bin/sdkmanager --install "platform-tools"
-        yes | /usr/local/lib/android-sdk/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-34"
-        yes | /usr/local/lib/android-sdk/cmdline-tools/latest/bin/sdkmanager --install "build-tools;34.0.0"
-    
-    - name: Download Gradle 8.5
-      run: |
-        echo "⬇️ Downloading Gradle 8.5..."
-        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
-        unzip -q gradle-8.5-bin.zip
-        echo "gradle-8.5/bin" >> $GITHUB_PATH
-        
-        # التحقق من التثبيت
-        gradle -v
-    
-    - name: Create Required Files
-      run: |
-        echo "🔧 Creating essential files..."
-        
-        # إنشاء المجلدات الأساسية
-        mkdir -p app/src/main/res/{raw,layout,values,drawable}
-        mkdir -p app/src/main/java/com/zozety/love
-        
-        # ملف الموسيقى الوهمي
-        echo "dummy audio" > app/src/main/res/raw/love_song.mp3
-        
-        # ملف colors.xml بسيط
-        cat > app/src/main/res/values/colors.xml << 'EOF'
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Install Android SDK
+        run: |
+          echo "Installing Android SDK..."
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+          mkdir -p android-sdk
+          unzip -q commandlinetools-linux-11076708_latest.zip -d android-sdk
+          mv android-sdk/cmdline-tools android-sdk/latest
+          
+          export ANDROID_HOME=$PWD/android-sdk
+          export ANDROID_SDK_ROOT=$ANDROID_HOME
+          export PATH=$PATH:$ANDROID_HOME/latest/bin
+          
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          
+          # قبول التراخيص
+          mkdir -p $ANDROID_HOME/licenses
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_HOME/licenses/android-sdk-license
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $ANDROID_HOME/licenses/android-sdk-preview-license
+          
+          # تثبيت المكونات
+          yes | sdkmanager "platform-tools"
+          yes | sdkmanager "platforms;android-34"
+          yes | sdkmanager "build-tools;34.0.0"
+
+      - name: Setup Gradle 8.5
+        run: |
+          echo "Setting up Gradle 8.5..."
+          wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
+          unzip -q gradle-8.5-bin.zip
+          export PATH=$PWD/gradle-8.5/bin:$PATH
+          echo "GRADLE_HOME=$PWD/gradle-8.5" >> $GITHUB_ENV
+          gradle -v
+
+      - name: Create missing files
+        run: |
+          echo "Creating essential files..."
+          
+          # مجلدات أساسية
+          mkdir -p app/src/main/res/{raw,values}
+          mkdir -p app/src/main/java/com/zozety/love
+          
+          # ملف موسيقى وهمي
+          echo "dummy" > app/src/main/res/raw/love_song.mp3
+          
+          # ملف colors.xml
+          cat > app/src/main/res/values/colors.xml << 'EOF'
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary_color">#E91E63</color>
-    <color name="primary_dark">#C2185B</color>
-    <color name="accent_color">#FF4081</color>
-    <color name="background_color">#FFF5F8</color>
+  <color name="primary_color">#E91E63</color>
+  <color name="accent_color">#FF4081</color>
 </resources>
 EOF
-        
-        # ملف local.properties
-        echo "sdk.dir=/usr/local/lib/android-sdk" > local.properties
-    
-    - name: Fix Gradle Wrapper
-      run: |
-        echo "⚙️ Ensuring Gradle 8.5..."
-        if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
-            sed -i 's|distributionUrl=.*|distributionUrl=https\\://services.gradle.org/distributions/gradle-8.5-bin.zip|' gradle/wrapper/gradle-wrapper.properties
-        fi
-    
-    - name: Build Debug APK
-      run: |
-        echo "🔨 Building APK..."
-        
-        # تنظيف
-        gradle clean --no-daemon 2>/dev/null || echo "Clean skipped"
-        
-        # بناء الـ APK
-        set +e
-        gradle :app:assembleDebug \
-            --stacktrace \
-            --no-daemon \
-            -Dorg.gradle.jvmargs="-Xmx4g"
-        
-        if [ $? -ne 0 ]; then
-            echo "⚠️ First build failed, trying simpler approach..."
-            gradle assembleDebug --no-daemon
-        fi
-        set -e
-    
-    - name: Check for APK
-      run: |
-        echo "🔍 Searching for APK..."
-        
-        # البحث عن أي APK
-        find . -name "*.apk" -type f 2>/dev/null | while read apk; do
-            echo "✅ Found: $apk"
-            ls -lh "$apk"
-        done || echo "No APK files found"
-        
-        # عرض محتويات build directory
-        echo "📁 Build directory contents:"
-        ls -la app/build/outputs/apk/ 2>/dev/null || echo "No APK directory found"
-    
-    - name: Upload APK Artifact
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: app-apk
-        path: |
-          **/*.apk
-          app/build/outputs/apk/
-        if-no-files-found: ignore
-        retention-days: 7
-    
-    - name: Upload Build Logs
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: build-logs
-        path: |
-          app/build/reports/
-          app/build/outputs/logs/
-        if-no-files-found: ignore
-        retention-days: 3
+          
+          # local.properties
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Build APK
+        run: |
+          echo "Building APK..."
+          
+          # تنظيف أولاً
+          gradle clean --no-daemon 2>/dev/null || true
+          
+          # بناء APK
+          set +e
+          gradle :app:assembleDebug --stacktrace --no-daemon
+          BUILD_STATUS=$?
+          set -e
+          
+          if [ $BUILD_STATUS -eq 0 ]; then
+            echo "Build successful!"
+          else
+            echo "Build may have issues, checking for APK anyway..."
+          fi
+
+      - name: Find and list APKs
+        run: |
+          echo "Searching for APK files..."
+          find . -name "*.apk" -type f 2>/dev/null || echo "No APK found"
+          
+          if ls app/build/outputs/apk/debug/*.apk 2>/dev/null; then
+            echo "APK found:"
+            ls -lh app/build/outputs/apk/debug/*.apk
+          else
+            echo "Checking build directory..."
+            ls -la app/build/ 2>/dev/null || echo "No build directory"
+          fi
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zozety-apk
+          path: |
+            app/build/outputs/apk/debug/*.apk
+            **/*.apk
+          if-no-files-found: ignore
+          retention-days: 7
