@@ -6,150 +6,164 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
-    - name: Setup Java
+    - name: Setup Java 17
       uses: actions/setup-java@v4
       with:
-        distribution: 'zulu'
         java-version: '17'
+        distribution: 'temurin'
     
     - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v2
       with:
-        api-level: 34
-        build-tools-version: '34.0.0'
-        ndk-version: '25.1.8937393'
-        cmake-version: '3.22.1'
+        cmdline-tools-version: 'latest'
     
-    - name: Fix Project Structure
+    - name: Create essential directories
       run: |
-        echo "🔧 Fixing project structure..."
+        echo "📁 Creating necessary directories..."
         
-        # إنشاء الملفات الأساسية إذا مش موجودة
+        # المجلدات الأساسية
         mkdir -p app/src/main/res/raw
         mkdir -p app/src/main/res/layout
         mkdir -p app/src/main/res/values
         mkdir -p app/src/main/res/drawable
-        mkdir -p app/src/main/java/com/zozety/love
+        mkdir -p app/src/main/res/mipmap-anydpi-v26
         
-        # إنشاء ملف موسيقى وهمي
-        echo "dummy" > app/src/main/res/raw/love_song.mp3
+        # إنشاء هيكل الكوتلن إذا مش موجود
+        mkdir -p app/src/main/java/com/zozety/love/{activities,services,receivers,utils,helpers}
         
-        # إنشاء أيقونة بسيطة
-        cat > app/src/main/res/drawable/ic_launcher_foreground.xml << 'EOF'
+        # ملف الموسيقى الوهمي
+        echo "dummy audio file" > app/src/main/res/raw/love_song.mp3
+        
+        # أيقونة بسيطة
+        cat > app/src/main/res/drawable/ic_heart.xml << 'EOF'
         <vector xmlns:android="http://schemas.android.com/apk/res/android"
-            android:width="108dp"
-            android:height="108dp"
-            android:viewportWidth="108"
-            android:viewportHeight="108">
-            <path android:fillColor="#FFD700"
-                android:pathData="M30,30 L78,30 L78,78 L30,78 z"/>
+            android:width="24dp"
+            android:height="24dp"
+            android:viewportWidth="24"
+            android:viewportHeight="24">
+            <path android:fillColor="#E91E63"
+                android:pathData="M12,21.35l-1.45,-1.32C5.4,15.36 2,12.28 2,8.5 2,5.42 4.42,3 7.5,3c1.74,0 3.41,0.81 4.5,2.09C13.09,3.81 14.76,3 16.5,3 19.58,3 22,5.42 22,8.5c0,3.78 -3.4,6.86 -8.55,11.54L12,21.35z"/>
         </vector>
         EOF
         
-        # إنشاء ملفات mipmap الأساسية
-        for density in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
-            mkdir -p "app/src/main/res/mipmap-$density"
-            cat > "app/src/main/res/mipmap-$density/ic_launcher.xml" << EOF
+        # ملف adaptative icon الأساسي
+        cat > app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml << 'EOF'
         <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-            <background android:drawable="@color/ic_launcher_background"/>
-            <foreground android:drawable="@drawable/ic_launcher_foreground"/>
+            <background android:drawable="@drawable/ic_launcher_background"/>
+            <foreground android:drawable="@drawable/ic_heart"/>
         </adaptive-icon>
         EOF
+        
+        # colors.xml أساسي إذا مش موجود
+        if [ ! -f "app/src/main/res/values/colors.xml" ]; then
+            cat > app/src/main/res/values/colors.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <color name="primary_color">#E91E63</color>
+            <color name="primary_dark">#C2185B</color>
+            <color name="accent_color">#FF4081</color>
+            <color name="background_color">#FFF5F8</color>
+            <color name="card_background">#FFFFFF</color>
+            <color name="text_color">#333333</color>
+            <color name="ic_launcher_background">#E91E63</color>
+        </resources>
+        EOF
+        fi
+        
+        # strings.xml أساسي إذا مش موجود
+        if [ ! -f "app/src/main/res/values/strings.xml" ]; then
+            cat > app/src/main/res/values/strings.xml << 'EOF'
+        <resources>
+            <string name="app_name">Zozety Love</string>
+            <string name="login_hint">كلمة السر الخاصة بنا</string>
+            <string name="login_button">دخول إلى عالم الحب</string>
+            <string name="new_message">رسالة جديدة</string>
+            <string name="speak_message">تكلم</string>
+            <string name="play_music">تشغيل الموسيقى</string>
+            <string name="stop_music">إيقاف</string>
+            <string name="add_image">إضافة صورة</string>
+            <string name="send_love">إرسال حب</string>
+            <string name="settings">الإعدادات</string>
+        </resources>
+        EOF
+        fi
+    
+    - name: Install Android SDK components
+      run: |
+        echo "📱 Installing Android SDK..."
+        
+        # تثبيت الـ SDK الأساسية
+        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+        
+        # تثبيت المكونات الأساسية
+        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+          "platform-tools" \
+          "platforms;android-34" \
+          "build-tools;34.0.0" \
+          "ndk;25.1.8937393" \
+          "cmake;3.22.1"
+    
+    - name: Set permissions for gradle
+      run: |
+        chmod +x ./gradlew 2>/dev/null || echo "gradlew not found, will use wrapper"
+        mkdir -p ~/.gradle
+        echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
+        echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> ~/.gradle/gradle.properties
+    
+    - name: Build Debug APK
+      run: |
+        echo "🔨 Building APK..."
+        
+        # محاولة البناء بـ gradle wrapper
+        if [ -f "./gradlew" ]; then
+            ./gradlew clean
+            ./gradlew :app:assembleDebug --stacktrace --no-daemon || \
+            ./gradlew assembleDebug --stacktrace --no-daemon
+        else
+            # استخدام gradle مباشرة
+            gradle clean
+            gradle :app:assembleDebug --stacktrace --no-daemon || \
+            gradle assembleDebug --stacktrace --no-daemon
+        fi
+    
+    - name: Find and list APK
+      run: |
+        echo "🔍 Searching for APK files..."
+        
+        # البحث في كل مكان
+        find . -name "*.apk" -type f 2>/dev/null | while read apk; do
+            echo "✅ Found: $apk ($(ls -lh "$apk" | awk '{print $5}'))"
         done
         
-        # إنشاء local.properties
-        echo "sdk.dir=\$ANDROID_HOME" > local.properties
-        
-        # تثبيت Gradle 8.5
-        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip
-        unzip -q gradle-8.5-bin.zip
-        echo "gradle-8.5/bin" >> $GITHUB_PATH
-    
-    - name: Accept Licenses
-      run: |
-        yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --update
-    
-    - name: Verify Android Setup
-      run: |
-        echo "Android SDK: $ANDROID_HOME"
-        echo "Java: $(java -version)"
-        echo "Gradle: $(gradle -version)"
-    
-    - name: Clean Project
-      run: |
-        ./gradlew clean || gradle clean
-    
-    - name: Build APK
-      run: |
-        # محاولة البناء مع إمكانية الفشل
-        set +e
-        
-        # خيار 1: بناء باستخدام wrapper
-        if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew :app:assembleDebug --stacktrace --info
-            BUILD_RESULT=$?
-        else
-            # خيار 2: بناء باستخدام gradle مباشرة
-            gradle :app:assembleDebug --stacktrace --info
-            BUILD_RESULT=$?
-        fi
-        
-        # حتى لو فشل، نحاول البحث عن أي APK موجود
-        if [ $BUILD_RESULT -ne 0 ]; then
-            echo "⚠️ Build may have failed, but let's check for APK anyway..."
-        fi
-        
-        set -e
-    
-    - name: List Build Output
-      run: |
-        echo "📁 Listing build directory..."
-        find . -name "*.apk" -type f 2>/dev/null || echo "No APK files found"
-        echo "---"
-        ls -la app/build/outputs/ 2>/dev/null || echo "No outputs directory"
-        echo "---"
-        ls -la app/build/ 2>/dev/null || echo "No build directory"
-    
-    - name: Check for APK Files
-      run: |
-        # البحث العميق عن أي ملف APK
-        echo "🔍 Deep searching for APK files..."
-        APK_FILES=$(find . -name "*.apk" -type f 2>/dev/null || true)
-        
-        if [ -n "$APK_FILES" ]; then
-            echo "✅ Found APK files:"
-            echo "$APK_FILES"
-            for apk in $APK_FILES; do
-                echo "📦 $apk - $(ls -lh "$apk" | awk '{print $5}')"
-            done
-        else
-            echo "❌ No APK files found in any directory"
-            echo "Trying to find any build artifacts..."
-            find . -name "*.aar" -o -name "*.jar" -type f 2>/dev/null | head -5
+        # إذا ما في APK، نعرض محتويات build
+        if ! find . -name "*.apk" -type f 2>/dev/null | grep -q .; then
+            echo "⚠️ No APK found, checking build output..."
+            ls -la app/build/outputs/ 2>/dev/null || echo "No outputs directory"
+            echo "--- Build logs ---"
+            find . -name "*.log" -type f 2>/dev/null | head -5
         fi
     
-    - name: Upload APK if exists
-      if: success() || failure()
+    - name: Upload APK Artifacts
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: apk-artifacts
+        name: zozety-love-apk
         path: |
           **/*.apk
-          app/build/outputs/
+          app/build/outputs/apk/
         if-no-files-found: warn
         retention-days: 7
     
-    - name: Upload Build Logs
-      if: always()
+    - name: Upload Build Reports
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: build-logs
+        name: build-reports
         path: |
-          **/build/reports/**
-          **/build/outputs/logs/**
+          app/build/reports/
+          app/build/outputs/logs/
         if-no-files-found: ignore
         retention-days: 7
